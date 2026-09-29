@@ -55,6 +55,12 @@ on any result deletes and respawns a new one -- this loops forever with no manua
 bolted down; `-0.08` for `base_x` balances the arm's reach into the maze against keeping it out
 of the overhead camera's view (see `maze_gazebo/config/scene.yaml` for the full reasoning).
 
+`move_group.launch.py` also opens RViz by default (`use_rviz:=false` to skip it), preloaded with
+RobotModel/TF/PlanningScene/MotionPlanning plus the maze-specific topics: `OverheadCamera`
+(`/overhead_camera/image`), `MazeOccupancyGrid` (`/maze_occupancy_grid`), `Path` (`/path`), and
+`Goals` (`/goals`, the start/exit poses perception found). The config is
+`maze_moveit_config/rviz/maze_solver.rviz`.
+
 ## Pointing this at a real robot
 
 ```bash
