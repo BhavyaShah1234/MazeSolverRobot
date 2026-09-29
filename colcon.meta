@@ -1,9 +1,0 @@
-{
-    "names": {
-        "libfranka": {
-            "cmake-args": [
-                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-            ]
-        }
-    }
-}

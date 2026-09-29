@@ -10,11 +10,30 @@ simulation details (a Gazebo-scoped TF frame name, pixel-space messages, a base 
 via URDF surgery, the environment directly commanding the arm). Everything that project could
 do, this one does too, restructured so hardware and simulation are genuinely decoupled.
 
+## Workspace overlay: this depends on `ros2_ws`
+
+`maze_ws` does not vendor Franka's own packages. `ros2_ws` (a sibling workspace) is the shared
+underlay for robotic-arm and autonomous-vehicle packages -- `franka_description`, `franka_ros2`
+(which provides `franka_hardware`, `franka_gripper`, `franka_msgs`, etc.), and `libfranka` all
+live and build there. `maze_ws` only holds the packages specific to this maze-solving project,
+and is built and run as an overlay on top of `ros2_ws`, the standard ROS 2 workspace-chaining
+pattern: every `colcon build` and every `ros2 launch`/`ros2 run` below assumes
+`ros2_ws/install/setup.bash` is sourced *before* `maze_ws/install/setup.bash`. If your shell
+sources both already (see `~/.bashrc`), there's nothing extra to do; otherwise:
+
+```bash
+source /path/to/ros2_ws/install/setup.bash
+source /path/to/maze_ws/install/setup.bash
+```
+
+Splitting it this way is what the overlay is for: `franka_description`/`franka_ros2`/`libfranka`
+are shared, reusable infrastructure that any future arm or AV project (not just this one) needs,
+while `maze_ws` stays a lean, project-scoped workspace on top of it.
+
 ## Packages
 
 | Package | What it is |
 |---|---|
-| `franka_description`, `franka_ros2`, `libfranka` | Franka's own submodules (arm URDF, ROS 2 driver, control library) |
 | `maze_interfaces` | `SolveMaze` action -- the one interface between the simulation-side referee and the solver |
 | `maze_description` | The FR3 + laser-rangefinder xacro. Base pose and the sim/hardware switch are plain xacro arguments, not something patched into the URDF after processing |
 | `maze_moveit_config` | SRDF, kinematics/joint-limits/OMPL config, and `move_group` launch, built with `MoveItConfigsBuilder` |
@@ -104,16 +123,35 @@ sudo apt install -y \
 `colcon build`-generated executables actually shebang to, which on a machine with its own
 externally-managed virtualenv on `PATH` is a different Python environment.)
 
-### 4. Clone and build
+### 4. Build `ros2_ws` first (the underlay)
+
+`maze_ws` needs `franka_description`, `franka_ros2`, and `libfranka` already built in `ros2_ws`
+-- see "Workspace overlay" above. In `ros2_ws` (with its own `franka_description`/`franka_ros2`/
+`libfranka` submodules cloned in):
 
 ```bash
-git clone --recurse-submodules <this repo> maze_ws
+cd /path/to/ros2_ws
+rosdep update
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install --packages-select franka_description franka_gripper franka_hardware franka_msgs libfranka \
+  --cmake-args -DBUILD_TESTING=OFF
+source install/setup.bash
+```
+
+`--cmake-args -DBUILD_TESTING=OFF` on `franka_hardware` specifically avoids a link failure in its
+test executables: `ros-jazzy-realtime-tools` (apt) and the copy of `realtime_tools` vendored
+inside the `franka_ros2` submodule aren't ABI-compatible, and only the test binaries (not the
+real plugin library) ever hit that symbol. `ros2_ws`'s own `colcon.meta` passes
+`CMAKE_POLICY_VERSION_MINIMUM=3.5` to `libfranka`, needed for it to build under a modern CMake.
+
+### 5. Clone and build `maze_ws`
+
+```bash
+git clone <this repo> maze_ws
 cd maze_ws
+source /path/to/ros2_ws/install/setup.bash
 rosdep update
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
-
-`colcon.meta` at the workspace root passes `CMAKE_POLICY_VERSION_MINIMUM=3.5` to `libfranka`,
-needed for it to build under a modern CMake.
