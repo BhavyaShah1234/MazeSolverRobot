@@ -1,0 +1,39 @@
+# gz_ros2_control/GazeboSimSystem only exports position/velocity command
+# interfaces in this setup, so joint_trajectory_controller commands position
+# directly.
+#
+# The `type` key here matters beyond just documenting it: Gazebo's embedded
+# controller_manager only knows about the controller types baked into
+# franka_arm.ros2_control.xacro's hardcoded <parameters> path (Franka's own
+# example controllers), which doesn't include joint_trajectory_controller at
+# all -- and that path has no override mechanism. Rather than patch the URDF
+# after the fact to point it elsewhere, `ros2 run controller_manager spawner
+# joint_trajectory_controller -p this_file` sets this controller's type (and
+# every other parameter below) directly on the running controller_manager
+# node before loading it, which is the standard, supported way to add a
+# controller a Gazebo plugin's own startup config doesn't know about.
+joint_trajectory_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    joints:
+      - fr3_joint1
+      - fr3_joint2
+      - fr3_joint3
+      - fr3_joint4
+      - fr3_joint5
+      - fr3_joint6
+      - fr3_joint7
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    # The control node sends position-only waypoints (no velocities), so the
+    # default "splines" interpolation has to invent smooth velocities at each
+    # one itself, and can overshoot well past the straight line between two
+    # waypoints while doing it -- confirmed live in the ros2_ws prototype:
+    # with splines, the laser tip cut through maze walls between waypoints
+    # even though every individual waypoint was solved to be wall-free, while
+    # linear interpolation between the same waypoints never left the
+    # corridor. "none" here means linear, not "no interpolation".
+    interpolation_method: "none"

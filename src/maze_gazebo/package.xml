@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>maze_gazebo</name>
+  <version>0.1.0</version>
+  <description>Sim-only: Gazebo world, overhead camera model, maze wall generation, and the referee node that drives the solve/reset loop against maze_solver's SolveMaze action</description>
+  <maintainer email="bshah43@asu.edu">Bhavya Shah</maintainer>
+  <license>Apache 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>python3-numpy</build_depend>
+  <depend>realsense2_description</depend>
+
+  <exec_depend>maze_interfaces</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <!-- mazelib has no rosdep key; installed via pip with the system's externally managed override flag -->
+  <exec_depend>mazelib</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

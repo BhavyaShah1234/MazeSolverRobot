@@ -1,0 +1,11 @@
+# Only manager-wide settings here. Each controller's own type is declared in
+# its own params file (joint_trajectory_controller_sim.yaml /
+# _hardware.yaml) and set via `spawner -p <file>` at load time -- the same
+# mechanism either way, whether controller_manager is this workspace's own
+# standalone ros2_control_node (real hardware) or the one Gazebo's
+# gz_ros2_control plugin embeds (sim), which already knows joint_state_broadcaster's
+# type from franka_arm.ros2_control.xacro's own hardcoded example-controllers
+# config.
+controller_manager:
+  ros__parameters:
+    update_rate: 1000  # Hz

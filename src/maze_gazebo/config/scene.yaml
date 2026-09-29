@@ -1,0 +1,64 @@
+# Overhead camera pose and maze placement/sizing -- sim-only scene layout.
+# The robot's own mount pose lives in maze_bringup's launch arguments
+# instead (base_x/base_y/base_z/base_yaw), not here: unlike the camera and
+# the maze, the robot's pose isn't a simulation-only detail, and a real FR3
+# deployment needs the same argument without any of this package.
+
+overhead_camera:
+  # Horizontal position, in meters, in the world frame. x is centered over
+  # the maze's x-span (corners span x in [0.1, 0.7], so midpoint 0.4).
+  x: 0.4
+  y: 0.0
+
+  # Height, in meters, is robot_height_m + clearance_m:
+  #  - robot_height_m: highest point of the FR3 arm (the wrist cluster) in
+  #    its default ready pose, from forward kinematics. Shouldn't need to
+  #    change unless the robot's default pose does.
+  #  - clearance_m: how far above that the camera sits. This is the knob to
+  #    turn to change the camera's height/ground footprint. At pitch =
+  #    straight down, the model.sdf's 640x480 sensor with horizontal_fov
+  #    1.047 rad has a narrower *vertical* FOV (~46.8 deg, from the 4:3
+  #    aspect ratio) than horizontal -- that's the binding constraint for
+  #    fitting the maze's 0.6 x 0.6 m square in frame. Minimum height to fit
+  #    it at all is ~0.69 m; 0.20 clearance (~0.90 m total) leaves margin
+  #    around the edges.
+  robot_height_m: 0.697
+  clearance_m: 0.20
+
+  # Orientation, in radians (roll, pitch, yaw). pitch = pi/2 (1.5707963)
+  # points the camera's optical axis (local +X) straight down at the floor.
+  # Change yaw to rotate the image; change roll/pitch away from this value
+  # to tilt the view off-vertical.
+  roll: 3.14159
+  pitch: 1.5707963
+  yaw: 0.0
+
+# Corners of the square the generated maze is rendered onto: grid x in
+# [0, cells_per_side] -> world x in [min corner x, max corner x], same for
+# y -- so moving these points moves and rescales the maze with them. Each
+# point is a real-world (x, y, z) location, in meters, in the world frame
+# (the robot faces +x).
+#
+# Only 3 of the square's 4 corners are defined below (bottom_right is left
+# out) -- 3 points are all the referee node needs to derive the square's
+# bounds, and the robot's spawn position is such that the 4th corner would
+# sit outside the arm's comfortable reach.
+maze:
+  cells_per_side: 10
+  wall_thickness_m: 0.006
+  wall_height_m: 0.03
+
+  top_left:
+    x: 0.1
+    y: 0.3
+    z: 0.02
+
+  top_right:
+    x: 0.7
+    y: 0.3
+    z: 0.02
+
+  bottom_left:
+    x: 0.1
+    y: -0.3
+    z: 0.02
