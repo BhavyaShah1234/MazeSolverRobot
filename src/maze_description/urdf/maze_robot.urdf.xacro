@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Franka FR3 + a laser-rangefinder end effector for the maze-solving project.
+
+Unlike franka_description's own fr3.urdf.xacro, this includes franka_robot.xacro
+directly so the base mount pose (base_x/base_y/base_z/base_yaw) and the sim/hardware
+switch (use_sim/use_fake_hardware/robot_ip) are ordinary xacro arguments, resolved once
+at processing time, not values patched into the URDF DOM after the fact in a launch
+file. franka_robot.xacro already builds the "world" link/joint at exactly the xyz/rpy
+it's given (see franka_robot.xacro lines ~104-117) and franka_arm.ros2_control.xacro
+already picks the right ros2_control hardware plugin from gazebo/use_fake_hardware
+(mock_components/GenericSystem, franka_gz_ros2_control/GZSystem, or
+franka_hardware/FrankaHardwareInterface), both extension points existed already,
+nothing here reinvents them.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="fr3">
+
+  <xacro:include filename="$(find franka_description)/robots/common/franka_robot.xacro"/>
+
+  <xacro:arg name="robot_type" default="fr3"/>
+
+  <!-- Where the arm is bolted down, in the world frame. -->
+  <xacro:arg name="base_x" default="0.0"/>
+  <xacro:arg name="base_y" default="0.0"/>
+  <xacro:arg name="base_z" default="0.0"/>
+  <xacro:arg name="base_yaw" default="0.0"/>
+
+  <!-- Sim/hardware switch: true builds the same URDF that ros2_ws's Gazebo launch
+       used; false + a real robot_ip targets a physical FR3 through franka_hardware.
+       use_fake_hardware is for mock_components/GenericSystem (no sim, no hardware,
+       useful for launch/config testing without either). -->
+  <xacro:arg name="use_sim" default="true"/>
+  <xacro:arg name="use_fake_hardware" default="false"/>
+  <xacro:arg name="robot_ip" default=""/>
+
+  <xacro:property name="robot_type" value="$(arg robot_type)"/>
+
+  <!-- parent="" deliberately disables franka_robot.xacro's own world-link/joint
+       creation (which is otherwise gated by gazebo and parent!='', per that macro's
+       "Definition of additional Gazebo tags" block): passing it a real base xyz/rpy
+       there did not reproduce reliably in isolated testing outside of going through
+       the full fr3.urdf.xacro wrapper (an upstream xacro-processing quirk, not
+       something worth depending on). Building world/world_joint directly below
+       instead, same plain-xacro approach already used for the laser link, and it
+       achieves the actual goal: base pose as an ordinary, resolved-once xacro
+       argument, with nothing patched into the URDF after xacro runs. -->
+  <xacro:franka_robot
+    robot_type="${robot_type}"
+    joint_limits="${xacro.load_yaml('$(find franka_description)/robots/fr3/joint_limits.yaml')}"
+    inertials="${xacro.load_yaml('$(find franka_description)/robots/fr3/inertials.yaml')}"
+    kinematics="${xacro.load_yaml('$(find franka_description)/robots/fr3/kinematics.yaml')}"
+    accelerometer_config="${xacro.load_yaml('$(find franka_description)/robots/fr3/accelerometers.yaml')}"
+    dynamics="${xacro.load_yaml('$(find franka_description)/robots/fr3/dynamics.yaml')}"
+    parent=""
+    hand="false"
+    gazebo="$(arg use_sim)"
+    ros2_control="true"
+    robot_ip="$(arg robot_ip)"
+    use_fake_hardware="$(arg use_fake_hardware)"
+  />
+
+  <link name="world"/>
+  <joint name="world_joint" type="fixed">
+    <origin xyz="$(arg base_x) $(arg base_y) $(arg base_z)" rpy="0 0 $(arg base_yaw)"/>
+    <parent link="world"/>
+    <child link="${robot_type}_link0"/>
+  </joint>
+
+  <!-- Laser rangefinder end effector, mounted at the flange (link8). The rod is
+       deliberately long (ROD_LENGTH): the sensor/emission point sits at its tip, one
+       full rod length out from the flange, so the arm can keep its flange well clear
+       of the maze walls (only ~0.03 m tall) while the tip still reaches down among
+       them. Pose/geometry ported unchanged from ros2_ws's add_laser_to_urdf(). -->
+  <xacro:property name="rod_length" value="0.12"/>
+
+  <link name="${robot_type}_laser_link">
+    <visual>
+      <origin xyz="0 0 ${-rod_length / 2.0}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${rod_length}" radius="0.005"/>
+      </geometry>
+      <material name="laser_red">
+        <color rgba="1 0 0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="${robot_type}_laser_joint" type="fixed">
+    <parent link="${robot_type}_link8"/>
+    <child link="${robot_type}_laser_link"/>
+    <origin xyz="0 0 ${rod_length}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- A gz-sim sensor's forward axis is local +X, and link8 (hence laser_link)
+       shares link7's orientation, whose local +Z is the flange's outward/tool-
+       pointing axis (verified against robots/fr3/kinematics.yaml's joint8 entry:
+       xyz 0 0 0.107, zero rotation), so this pitches -90 degrees to align +X with
+       the link's +Z. Harmless on real hardware: <gazebo> extension tags are only
+       consumed by gz-sim and ignored by everything else. -->
+  <gazebo reference="${robot_type}_laser_link">
+    <sensor name="end_effector_laser" type="gpu_lidar">
+      <pose>0 0 0 0 -1.5707963 0</pose>
+      <topic>end_effector_laser</topic>
+      <update_rate>30</update_rate>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>1</samples>
+            <resolution>1</resolution>
+            <min_angle>0</min_angle>
+            <max_angle>0</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>1</samples>
+            <resolution>1</resolution>
+            <min_angle>0</min_angle>
+            <max_angle>0</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.02</min>
+          <max>5.0</max>
+          <resolution>0.001</resolution>
+        </range>
+      </lidar>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+
+</robot>

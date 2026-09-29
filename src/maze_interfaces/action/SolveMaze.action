@@ -1,0 +1,7 @@
+# Goal: empty -- perception re-digitizes whatever the camera currently sees
+# when this goal is accepted; there is nothing else to configure per-solve.
+---
+bool success
+string message
+---
+string stage
