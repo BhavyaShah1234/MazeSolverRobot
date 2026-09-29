@@ -1,0 +1,12 @@
+[submodule "src/franka_description"]
+	path = src/franka_description
+	url = https://github.com/frankaemika/franka_description.git
+	branch = jazzy
+[submodule "src/franka_ros2"]
+	path = src/franka_ros2
+	url = https://github.com/frankaemika/franka_ros2.git
+	branch = jazzy
+[submodule "src/libfranka"]
+	path = src/libfranka
+	url = https://github.com/frankaemika/libfranka.git
+	branch = main
