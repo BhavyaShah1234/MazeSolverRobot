@@ -1,3 +1,11 @@
+"""Plans a simplified Cartesian path through a digitized maze.
+
+Subscribes to the metric occupancy grid and start/goal poses published by
+``perception_node``, runs A* over a downsampled, safety-inflated copy of the
+grid, reduces the resulting cell path to its corners, and publishes the
+result as a :class:`nav_msgs.msg.Path` for ``control_node`` to trace.
+"""
+
 # heapq: priority queue backing the A* open set.
 import heapq
 # OpenCV: resizing/dilating the occupancy grid into a coarser planning grid.
@@ -10,8 +18,8 @@ import rclpy as r
 from rclpy.node import Node
 # QoS classes: needed to subscribe/publish with matching transient-local durability.
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-# PoseArray for the incoming start/goal poses; PoseStamped for path waypoints.
-from geometry_msgs.msg import PoseArray, PoseStamped
+# Pose for a single start/goal point; PoseArray for the incoming start/goal poses; PoseStamped for path waypoints.
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 # OccupancyGrid: the metric maze grid from perception; Path: the planned route to publish.
 from nav_msgs.msg import OccupancyGrid, Path
 
@@ -22,12 +30,21 @@ INFLATE_CELLS = 1
 
 # The node that turns a metric occupancy grid + start/goal poses into a simplified Cartesian path.
 class PlanningNode(Node):
+    """Plans and publishes a simplified path through the digitized maze.
+
+    Attributes:
+        grid: The most recently received occupancy grid, or ``None`` until
+            perception has published one.
+        path_publisher: Publisher for the planned (and simplified) path.
+    """
+
     # Constructor: sets up state, subscriptions, and the path publisher.
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initializes state, subscriptions, and the path publisher."""
         # Register this node with rclpy under the name "planning_node".
         super(PlanningNode, self).__init__(node_name='planning_node')
         # The most recently received occupancy grid; None until perception publishes one.
-        self.grid = None
+        self.grid: OccupancyGrid | None = None
         # QoS matching perception's transient-local, reliable publishers.
         path_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         # Subscribe to the digitized occupancy grid.
@@ -40,12 +57,31 @@ class PlanningNode(Node):
         self.get_logger().info('planning_node started')
 
     # Store the latest occupancy grid whenever one arrives.
-    def grid_callback(self, grid_message):
+    def grid_callback(self, grid_message: OccupancyGrid) -> None:
+        """Stores the latest occupancy grid for later use.
+
+        Args:
+            grid_message: The digitized occupancy grid just published by
+                perception_node.
+        """
         # Just remember the message; used lazily by goals_callback.
         self.grid = grid_message
 
     # Downsample and inflate the full-resolution grid into a coarser, safety-margined planning grid.
-    def downsample(self, grid_message, scale, inflate):
+    def downsample(self, grid_message: OccupancyGrid, scale: int, inflate: int) -> np.ndarray:
+        """Downsamples and inflates a full-resolution grid for planning.
+
+        Args:
+            grid_message: The full-resolution occupancy grid to downsample.
+            scale: How many full-resolution cells are merged into one
+                planning-grid cell.
+            inflate: How many planning cells to dilate obstacles by, as a
+                safety margin.
+
+        Returns:
+            A boolean array, shaped (height, width), where ``True`` marks a
+            blocked (wall, safety margin, or outside-the-maze) cell.
+        """
         # Binarize the raw grid data (>0 means occupied) and reshape it to (height, width).
         wall = (np.asarray(grid_message.data, dtype=np.int8) > 0).astype(np.uint8).reshape(grid_message.info.height, grid_message.info.width)
         # Compute the downsampled grid's width and height.
@@ -73,12 +109,31 @@ class PlanningNode(Node):
         return blocked
 
     # Manhattan distance heuristic for A*, admissible on a 4-connected grid.
-    def heuristic(self, a, b):
+    def heuristic(self, a: tuple[int, int], b: tuple[int, int]) -> int:
+        """Computes the Manhattan distance between two grid cells.
+
+        Args:
+            a: The first cell, as (x, y).
+            b: The second cell, as (x, y).
+
+        Returns:
+            The Manhattan distance between ``a`` and ``b``.
+        """
         # Sum of absolute coordinate differences.
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     # Return the in-bounds 4-connected neighbors of a grid cell.
-    def neighbors(self, cell, width, height):
+    def neighbors(self, cell: tuple[int, int], width: int, height: int) -> list[tuple[int, int]]:
+        """Returns the in-bounds 4-connected neighbors of a grid cell.
+
+        Args:
+            cell: The cell to find neighbors of, as (x, y).
+            width: The grid's width, in cells.
+            height: The grid's height, in cells.
+
+        Returns:
+            The neighboring cells that fall within [0, width) x [0, height).
+        """
         # Unpack the cell's coordinates.
         x, y = cell
         # The four axis-aligned neighbor candidates.
@@ -87,7 +142,21 @@ class PlanningNode(Node):
         return [candidate for candidate in candidates if 0 <= candidate[0] < width and 0 <= candidate[1] < height]
 
     # Walk the came_from chain from a goal cell back to the start, then reverse it.
-    def reconstruct_path(self, came_from, current):
+    def reconstruct_path(
+        self,
+        came_from: dict[tuple[int, int], tuple[int, int]],
+        current: tuple[int, int],
+    ) -> list[tuple[int, int]]:
+        """Reconstructs the start-to-goal path from A*'s predecessor map.
+
+        Args:
+            came_from: Maps each visited cell to the predecessor it was
+                reached from.
+            current: The goal cell to walk backward from.
+
+        Returns:
+            The ordered path of cells from start to goal, inclusive.
+        """
         # Start the path at the goal cell.
         path = [current]
         # Follow predecessors back to the start.
@@ -102,7 +171,24 @@ class PlanningNode(Node):
         return path
 
     # Standard grid A* search from start to goal over the blocked/free grid.
-    def astar(self, blocked, start, goal):
+    def astar(
+        self,
+        blocked: np.ndarray,
+        start: tuple[int, int],
+        goal: tuple[int, int],
+    ) -> list[tuple[int, int]] | None:
+        """Runs 4-connected grid A* from start to goal.
+
+        Args:
+            blocked: A boolean array, shaped (height, width), where ``True``
+                marks a cell that can't be traversed.
+            start: The starting cell, as (x, y).
+            goal: The goal cell, as (x, y).
+
+        Returns:
+            The ordered path of cells from start to goal, inclusive, or
+            ``None`` if no path exists.
+        """
         # Grid dimensions.
         height, width = blocked.shape
         # Priority queue of (estimated_total_cost, cost_so_far, cell), seeded with the start cell.
@@ -143,12 +229,22 @@ class PlanningNode(Node):
         return None
 
     # Reduce a cell-by-cell path down to just its endpoints and direction-change corners.
-    def simplify(self, cells):
-        # Keep only the endpoints and the cells where direction changes
-        # (corners): every A* cell becoming its own waypoint made the
-        # executor interpolate needlessly finely through long straight
-        # corridors. The control node interpolates the Cartesian segments
-        # between these corners itself.
+    def simplify(self, cells: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """Reduces a cell-by-cell path to its endpoints and corners.
+
+        Keep only the endpoints and the cells where direction changes
+        (corners): every A* cell becoming its own waypoint made the
+        executor interpolate needlessly finely through long straight
+        corridors. The control node interpolates the Cartesian segments
+        between these corners itself.
+
+        Args:
+            cells: The full, cell-by-cell A* path.
+
+        Returns:
+            The same path, reduced to its first cell, last cell, and every
+            cell where the direction of travel changes.
+        """
         # A path of 2 or fewer cells is already as simple as it can be.
         if len(cells) <= 2:
             # Nothing to simplify.
@@ -173,7 +269,18 @@ class PlanningNode(Node):
         return simplified
 
     # Convert a planning-grid (downsampled) coordinate into a world-frame (x, y) point.
-    def grid_xy_to_world(self, grid_message, gx, gy):
+    def grid_xy_to_world(self, grid_message: OccupancyGrid, gx: float, gy: float) -> tuple[float, float]:
+        """Converts a full-resolution grid-cell coordinate into world (x, y).
+
+        Args:
+            grid_message: The occupancy grid whose origin/orientation this
+                coordinate is expressed relative to.
+            gx: The full-resolution grid-cell X coordinate.
+            gy: The full-resolution grid-cell Y coordinate.
+
+        Returns:
+            The corresponding (x, y) point in the world frame.
+        """
         # Full-resolution grid's meters-per-cell.
         resolution = grid_message.info.resolution
         # The grid's origin pose (position + orientation) in the world frame.
@@ -196,8 +303,45 @@ class PlanningNode(Node):
         # Return the world-frame (x, y) point.
         return world_x, world_y
 
+    # Convert a world-frame pose into a planning-grid (downsampled) cell.
+    def to_grid_cell(pose: Pose, grid: OccupancyGrid) -> tuple[int, int]:
+        """Converts a world-frame pose into a planning-grid cell.
+
+        Invert grid_xy_to_world for the full-resolution grid, then scale down to the downsampled A* grid.
+
+        Args:
+            pose: The world-frame pose to convert.
+            grid: The occupancy grid whose origin/orientation/resolution
+                this pose is expressed relative to.
+
+        Returns:
+            The corresponding downsampled planning-grid cell, as (x, y).
+        """
+        # The grid's orientation quaternion.
+        q = grid.info.origin.orientation
+        # Recover the yaw angle from the quaternion's z/w components.
+        yaw = 2.0 * np.arctan2(q.z, q.w)
+        # Cosine and sine of the yaw, for the inverse 2D rotation.
+        cos_yaw, sin_yaw = np.cos(yaw), np.sin(yaw)
+        # Pose position relative to the grid's origin, in world X.
+        dx = pose.position.x - grid.info.origin.position.x
+        # Pose position relative to the grid's origin, in world Y.
+        dy = pose.position.y - grid.info.origin.position.y
+        # Inverse-rotate into the grid's local X, then convert to full-resolution cell units.
+        local_x = (cos_yaw * dx + sin_yaw * dy) / grid.info.resolution
+        # Inverse-rotate into the grid's local Y, then convert to full-resolution cell units.
+        local_y = (-sin_yaw * dx + cos_yaw * dy) / grid.info.resolution
+        # Scale down from full-resolution cells to planning-grid cells.
+        return int(local_x) // DOWNSAMPLE_CELLS, int(local_y) // DOWNSAMPLE_CELLS
+
     # Runs whenever a new start/goal PoseArray arrives: plans and publishes a path.
-    def goals_callback(self, goals_message):
+    def goals_callback(self, goals_message: PoseArray) -> None:
+        """Plans and publishes a path whenever a new start/goal pair arrives.
+
+        Args:
+            goals_message: The start/goal poses just published by
+                perception_node.
+        """
         # Guard everything so a transient bad input doesn't crash the node.
         try:
             # Can't plan without a grid yet.
@@ -209,31 +353,10 @@ class PlanningNode(Node):
             # Unpack the start and goal poses.
             start_pose, goal_pose = goals_message.poses
 
-            # Convert a world-frame pose into a planning-grid (downsampled) cell.
-            def to_grid_cell(pose):
-                # Invert grid_xy_to_world for the full-resolution grid, then
-                # scale down to the downsampled A* grid.
-                # The grid's orientation quaternion.
-                q = self.grid.info.origin.orientation
-                # Recover the yaw angle from the quaternion's z/w components.
-                yaw = 2.0 * np.arctan2(q.z, q.w)
-                # Cosine and sine of the yaw, for the inverse 2D rotation.
-                cos_yaw, sin_yaw = np.cos(yaw), np.sin(yaw)
-                # Pose position relative to the grid's origin, in world X.
-                dx = pose.position.x - self.grid.info.origin.position.x
-                # Pose position relative to the grid's origin, in world Y.
-                dy = pose.position.y - self.grid.info.origin.position.y
-                # Inverse-rotate into the grid's local X, then convert to full-resolution cell units.
-                local_x = (cos_yaw * dx + sin_yaw * dy) / self.grid.info.resolution
-                # Inverse-rotate into the grid's local Y, then convert to full-resolution cell units.
-                local_y = (-sin_yaw * dx + cos_yaw * dy) / self.grid.info.resolution
-                # Scale down from full-resolution cells to planning-grid cells.
-                return int(local_x) // DOWNSAMPLE_CELLS, int(local_y) // DOWNSAMPLE_CELLS
-
             # Convert the start pose to a planning-grid cell.
-            start = to_grid_cell(start_pose)
+            start = self.to_grid_cell(start_pose, self.grid)
             # Convert the goal pose to a planning-grid cell.
-            goal = to_grid_cell(goal_pose)
+            goal = self.to_grid_cell(goal_pose, self.grid)
             # Run A* over the planning grid.
             cells = self.astar(blocked, start, goal)
             # No path exists between start and goal.
@@ -278,7 +401,13 @@ class PlanningNode(Node):
             pass
 
 # Standard ROS2 Python entry point.
-def main(args=None):
+def main(args: list[str] | None = None) -> None:
+    """Initializes rclpy, spins PlanningNode, and shuts down on exit.
+
+    Args:
+        args: Command-line arguments forwarded to rclpy, or ``None`` to use
+            ``sys.argv``.
+    """
     # Initialize the rclpy context.
     r.init(args=args)
     # Construct the node.

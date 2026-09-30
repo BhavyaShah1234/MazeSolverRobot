@@ -1,3 +1,11 @@
+"""Launches the Gazebo world, overhead camera, and referee node.
+
+Starts Gazebo with the maze-solving world, spawns the overhead camera model
+at its configured pose, bridges its topics and the simulation clock onto
+ROS2, publishes the camera's static TF transform, and launches the referee
+node that drives the continuous spawn/solve/respawn loop.
+"""
+
 # os.path/os.environ, used for file paths and setting GZ_SIM_RESOURCE_PATH.
 import os
 
@@ -16,7 +24,12 @@ from launch_ros.actions import Node
 
 
 # Load and parse this package's scene.yaml (camera pose, maze layout/sizing).
-def get_scene():
+def get_scene() -> dict:
+    """Loads and parses this package's scene.yaml.
+
+    Returns:
+        The parsed scene configuration (camera pose, maze layout/sizing).
+    """
     # This package's installed share directory.
     share_dir = get_package_share_directory('maze_gazebo')
     # Open scene.yaml from the installed config directory.
@@ -26,7 +39,13 @@ def get_scene():
 
 
 # Entry point ros2 launch calls to build this launch file's description.
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
+    """Builds the launch description for the Gazebo world and camera.
+
+    Returns:
+        The launch description: the Gazebo world, clock/camera bridges, the
+        camera spawn and its static TF, and the referee node.
+    """
     # This package's installed share directory.
     share_dir = get_package_share_directory('maze_gazebo')
     # The parsed scene configuration.

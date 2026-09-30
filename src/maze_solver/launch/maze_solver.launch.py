@@ -1,3 +1,9 @@
+"""Launches the hardware-agnostic maze-solving node stack.
+
+Starts perception_node, planning_node, and control_node together, all
+sharing a single ``use_sim_time`` argument.
+"""
+
 # Base class for a launch file's returned description.
 from launch import LaunchDescription
 # Declares a launch argument that can be overridden from the command line.
@@ -9,7 +15,13 @@ from launch_ros.actions import Node
 
 
 # Entry point ros2 launch calls to build this launch file's description.
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
+    """Builds the launch description for the maze-solving node stack.
+
+    Returns:
+        The launch description: one ``use_sim_time`` argument plus the
+        three solver nodes.
+    """
     # Resolves to whatever value the use_sim_time argument is given.
     use_sim_time = LaunchConfiguration('use_sim_time')
     # Return the full description: one launch argument plus the three solver nodes.

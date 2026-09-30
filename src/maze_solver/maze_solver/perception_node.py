@@ -1,3 +1,12 @@
+"""Digitizes the overhead camera feed into a metric occupancy grid.
+
+Waits for a stable, unobstructed camera frame, thresholds it to find the
+maze's walls and entrance/exit openings, and publishes the result as a
+metric :class:`nav_msgs.msg.OccupancyGrid` plus a
+:class:`geometry_msgs.msg.PoseArray` of start/goal poses, using the
+camera's live TF pose rather than any simulation-specific assumption.
+"""
+
 # OpenCV: HSV color masking and connected-component analysis on the camera image.
 import cv2
 # NumPy: vector/matrix math for camera-pose and pixel<->world conversions.
@@ -22,8 +31,8 @@ from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import Pose, PoseArray, Quaternion
 # OccupancyGrid: the metric, ROS-standard message this node publishes the digitized maze as.
 from nav_msgs.msg import OccupancyGrid
-# Empty: the trigger message that (re)starts perception for a new maze.
-from std_msgs.msg import Empty
+# Empty: the trigger message that (re)starts perception for a new maze; Header: a message's own timestamp/frame.
+from std_msgs.msg import Empty, Header
 
 # Number of consecutive identical camera frames required before trusting a digitization.
 STABLE_FRAMES = 5
@@ -47,7 +56,18 @@ LOCAL_COLUMN_AXIS = np.array([0.0, -1.0, 0.0])
 LOCAL_ROW_AXIS = np.array([0.0, 0.0, -1.0])
 
 # Convert a quaternion (x, y, z, w) into a 3x3 rotation matrix.
-def quaternion_to_matrix(x, y, z, w):
+def quaternion_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
+    """Converts a quaternion into a 3x3 rotation matrix.
+
+    Args:
+        x: Quaternion x component.
+        y: Quaternion y component.
+        z: Quaternion z component.
+        w: Quaternion w component.
+
+    Returns:
+        The equivalent 3x3 rotation matrix.
+    """
     # Standard quaternion-to-rotation-matrix formula, returned as a 3x3 NumPy array.
     return np.array([
         # First row of the rotation matrix.
@@ -60,24 +80,48 @@ def quaternion_to_matrix(x, y, z, w):
 
 # The node that turns overhead-camera frames into a metric occupancy grid and start/goal poses.
 class PerceptionNode(Node):
+    """Digitizes overhead-camera frames into a metric grid and goal poses.
+
+    Attributes:
+        bridge: Converts ROS Image messages to OpenCV arrays.
+        camera_info: The latest camera intrinsics, or ``None`` until the
+            first message arrives.
+        triggered: Whether this perception run has already locked onto a
+            stable, trusted frame.
+        candidate_data: The most recent mask, kept to compare against the
+            next frame for stability.
+        stable_count: How many consecutive frames have matched
+            ``candidate_data`` so far.
+        frozen_grid: The grid message computed once ``triggered`` is
+            ``True``, republished every frame after that.
+        frozen_goals: The goals message computed once ``triggered`` is
+            ``True``, republished every frame after that.
+        tf_buffer: Buffers incoming TF transforms for synchronous lookup.
+        tf_listener: Subscribes to /tf and /tf_static, filling ``tf_buffer``.
+        grid_publisher: Publisher for the digitized occupancy grid.
+        goals_publisher: Publisher for the start/goal poses found in the
+            maze.
+    """
+
     # Constructor: sets up state, subscriptions, publishers, and TF listening.
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initializes state, subscriptions, publishers, and TF listening."""
         # Register this node with rclpy under the name "perception_node".
         super(PerceptionNode, self).__init__(node_name='perception_node')
         # CvBridge instance reused across every incoming frame.
         self.bridge = CvBridge()
         # Latest CameraInfo (intrinsics); None until the first message arrives.
-        self.camera_info = None
+        self.camera_info: CameraInfo | None = None
         # Whether this perception run has already locked onto a stable, trusted frame.
-        self.triggered = False
+        self.triggered: bool = False
         # The most recent mask, kept to compare against the next frame for stability.
-        self.candidate_data = None
+        self.candidate_data: list | None = None
         # How many consecutive frames have matched candidate_data so far.
-        self.stable_count = 0
+        self.stable_count: int = 0
         # The grid message computed once triggered==True, republished every frame after that.
-        self.frozen_grid = None
+        self.frozen_grid: OccupancyGrid | None = None
         # The goals message computed once triggered==True, republished every frame after that.
-        self.frozen_goals = None
+        self.frozen_goals: PoseArray | None = None
         # Buffers incoming TF transforms so lookup_transform can be called synchronously.
         self.tf_buffer = tf2_ros.Buffer()
         # Subscribes to /tf and /tf_static on this node's behalf, filling tf_buffer.
@@ -98,12 +142,23 @@ class PerceptionNode(Node):
         self.get_logger().info('perception_node started')
 
     # Store the latest camera intrinsics whenever a new CameraInfo message arrives.
-    def camera_info_callback(self, camera_info_message):
+    def camera_info_callback(self, camera_info_message: CameraInfo) -> None:
+        """Stores the latest camera intrinsics for later use.
+
+        Args:
+            camera_info_message: The camera's intrinsics, published
+                alongside its image stream.
+        """
         # Just remember the message; used lazily by build_grid_and_goals.
         self.camera_info = camera_info_message
 
     # Reset all per-cycle state so perception starts looking for a fresh stable frame.
-    def start_callback(self, empty_message):
+    def start_callback(self, empty_message: Empty) -> None:
+        """Resets all per-cycle state to begin a new perception cycle.
+
+        Args:
+            empty_message: The trigger message; carries no data.
+        """
         # Clear the "already locked on" flag.
         self.triggered = False
         # Forget the previous candidate frame data.
@@ -118,7 +173,16 @@ class PerceptionNode(Node):
         self.get_logger().info('perception restarted, looking for a new stable frame')
 
     # Decode a ROS Image message into a BGR OpenCV array, regardless of its original encoding.
-    def decode_image(self, image_message):
+    def decode_image(self, image_message: Image) -> np.ndarray:
+        """Decodes a ROS Image message into a BGR OpenCV array.
+
+        Args:
+            image_message: The camera image to decode.
+
+        Returns:
+            The image as a BGR OpenCV array, regardless of its original
+            encoding.
+        """
         # Let CvBridge do the raw decode first, in whatever encoding the message declares.
         image = self.bridge.imgmsg_to_cv2(image_message)
         # RGB images need a channel swap to become BGR (OpenCV's native order).
@@ -137,14 +201,33 @@ class PerceptionNode(Node):
         return image
 
     # Threshold the image to a binary mask of "green wall" pixels.
-    def digitize_mask(self, image):
+    def digitize_mask(self, image: np.ndarray) -> np.ndarray:
+        """Thresholds an image to a binary mask of "green wall" pixels.
+
+        Args:
+            image: A BGR image, as returned by :meth:`decode_image`.
+
+        Returns:
+            A single-channel mask where wall pixels are 255 and everything
+            else is 0.
+        """
         # Convert to HSV, since color thresholding is far more robust in HSV than BGR.
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         # Keep only pixels within the green wall's HSV range.
         return cv2.inRange(hsv_image, (35, 40, 40), (85, 255, 255))
 
     # Find the pixel coordinates of the maze's entrance and exit openings along its outer border.
-    def compute_goals_pixels(self, mask):
+    def compute_goals_pixels(self, mask: np.ndarray) -> list[tuple[int, int]] | None:
+        """Finds the maze's entrance/exit opening pixels along its border.
+
+        Args:
+            mask: The binary wall mask, as returned by :meth:`digitize_mask`.
+
+        Returns:
+            A two-element list of (column, row) pixel coordinates, entrance
+            first then exit, or ``None`` if either opening isn't
+            unambiguously found.
+        """
         # Binarize the mask to 0/1 for connected-component analysis.
         wall = (mask > 0).astype(np.uint8)
         # Label connected wall blobs so small noise specks can be filtered out.
@@ -185,7 +268,16 @@ class PerceptionNode(Node):
         return openings
 
     # Look up the camera's current pose and derive its column/row world-direction vectors.
-    def camera_pose(self, frame_id):
+    def camera_pose(self, frame_id: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Looks up the camera's pose and its column/row world directions.
+
+        Args:
+            frame_id: The TF frame the camera's image data is published in.
+
+        Returns:
+            A tuple of (camera world position, column world direction,
+            row world direction); the two direction vectors are 2D (x, y).
+        """
         # Get the camera's transform relative to "world" at the latest available time.
         transform = self.tf_buffer.lookup_transform('world', frame_id, Time())
         # Camera's translation component.
@@ -202,7 +294,17 @@ class PerceptionNode(Node):
         return np.array([t.x, t.y, t.z]), column_dir[:2], row_dir[:2]
 
     # Build the metric OccupancyGrid and the start/goal PoseArray from one digitized mask.
-    def build_grid_and_goals(self, mask, header):
+    def build_grid_and_goals(self, mask: np.ndarray, header: Header) -> tuple[OccupancyGrid, PoseArray | None]:
+        """Builds the metric occupancy grid and start/goal poses from a mask.
+
+        Args:
+            mask: The binary wall mask, as returned by :meth:`digitize_mask`.
+            header: The source image's header (timestamp and TF frame).
+
+        Returns:
+            A tuple of (occupancy grid, goals). ``goals`` is ``None`` if the
+            entrance/exit openings weren't unambiguously found in ``mask``.
+        """
         # Camera position and its column/row world-direction vectors.
         camera_xyz, column_dir, row_dir = self.camera_pose(header.frame_id)
         # Focal length (pixels), assuming square pixels (fx == fy).
@@ -281,7 +383,16 @@ class PerceptionNode(Node):
         return grid_message, goals_message
 
     # Build a grid of the same size/shape as `like`, but fully occupied -- used as a "not ready yet" placeholder.
-    def occupied_grid(self, like):
+    def occupied_grid(self, like: OccupancyGrid) -> OccupancyGrid:
+        """Builds a fully-occupied placeholder grid matching another one's shape.
+
+        Args:
+            like: The grid to copy header/size/origin metadata from.
+
+        Returns:
+            A new occupancy grid with the same metadata as ``like``, but
+            with every cell marked occupied.
+        """
         # Start a new OccupancyGrid message.
         grid_message = OccupancyGrid()
         # Reuse the reference message's header.
@@ -294,7 +405,12 @@ class PerceptionNode(Node):
         return grid_message
 
     # Runs on every incoming camera frame: digitizes it and publishes a grid (frozen or placeholder).
-    def image_callback(self, image_message):
+    def image_callback(self, image_message: Image) -> None:
+        """Digitizes each incoming frame and publishes a grid.
+
+        Args:
+            image_message: The latest overhead camera image.
+        """
         # Guard everything so a transient bad frame doesn't crash the node.
         try:
             # Can't do the pixel<->world math without intrinsics yet.
@@ -363,7 +479,13 @@ class PerceptionNode(Node):
             pass
 
 # Standard ROS2 Python entry point.
-def main(args=None):
+def main(args: list[str] | None = None) -> None:
+    """Initializes rclpy, spins PerceptionNode, and shuts down on exit.
+
+    Args:
+        args: Command-line arguments forwarded to rclpy, or ``None`` to use
+            ``sys.argv``.
+    """
     # Initialize the rclpy context.
     r.init(args=args)
     # Construct the node.

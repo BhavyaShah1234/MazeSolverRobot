@@ -1,3 +1,11 @@
+"""Launches MoveIt2's move_group and, optionally, RViz.
+
+Assembles the full MoveIt2 configuration from this package's own SRDF,
+kinematics, joint-limits, and OMPL config files via ``MoveItConfigsBuilder``,
+starts ``move_group``, and starts RViz preloaded with the robot, planning
+scene, and this project's maze-solving topics.
+"""
+
 # os.path, used to build xacro/rviz file paths.
 import os
 
@@ -18,7 +26,13 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 
 # Entry point ros2 launch calls to build this launch file's description.
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
+    """Builds the launch description for move_group and RViz.
+
+    Returns:
+        The launch description: the declared arguments, the move_group
+        node, and the (conditionally launched) RViz node.
+    """
     # Resolves to whatever the use_sim argument is given.
     use_sim = LaunchConfiguration('use_sim')
     # Resolves to whatever the use_fake_hardware argument is given.

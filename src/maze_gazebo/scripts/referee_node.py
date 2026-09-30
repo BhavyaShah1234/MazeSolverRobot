@@ -1,4 +1,11 @@
 #!/usr/bin/python3
+"""Drives the continuous spawn -> solve -> respawn maze loop in simulation.
+
+Loads the maze's corner/sizing configuration, generates a random maze
+layout, spawns it into Gazebo as inline SDF, and repeatedly calls the
+solver's ``SolveMaze`` action, respawning a fresh maze after every result.
+"""
+
 # subprocess: used to invoke the `gz service` CLI for maze removal/creation.
 import subprocess
 # rclpy aliased to r, matching this project's ROS2 node convention.
@@ -15,6 +22,8 @@ from maze_interfaces.action import SolveMaze
 from rclpy.action import ActionClient
 # Base class for all ROS2 nodes in rclpy.
 from rclpy.node import Node
+# Future: the type returned by async action calls this node reacts to.
+from rclpy.task import Future
 # Path-joining for the scene.yaml file location.
 import os
 # YAML parsing for scene.yaml.
@@ -27,8 +36,19 @@ MAZE_ENTITY_NAME = 'calibration_maze'
 
 # The node that spawns mazes, calls SolveMaze, and loops forever.
 class RefereeNode(Node):
+    """Spawns mazes, calls SolveMaze, and loops forever.
+
+    Attributes:
+        corners: The maze corner/sizing configuration loaded from
+            scene.yaml.
+        solve_maze_client: Client for the solver's SolveMaze action.
+        startup_timer: Polls (non-blocking) until the SolveMaze server is
+            ready, then sends the first goal.
+    """
+
     # Constructor: loads scene config, sets up the action client, and spawns the first maze.
-    def __init__(self):
+    def __init__(self) -> None:
+        """Loads scene config, sets up the action client, and spawns the first maze."""
         # Register this node with rclpy under the name "referee_node".
         super(RefereeNode, self).__init__(node_name='referee_node')
         # This package's installed share directory.
@@ -38,7 +58,7 @@ class RefereeNode(Node):
             # Load the whole scene configuration.
             scene = yaml.safe_load(f)
         # Keep just the maze corner/sizing config.
-        self.corners = scene['maze']
+        self.corners: dict = scene['maze']
         # Client for the solver's SolveMaze action.
         self.solve_maze_client = ActionClient(self, SolveMaze, '/solve_maze')
         # Polls (non-blocking) until the SolveMaze server is ready, then sends the first goal.
@@ -49,7 +69,12 @@ class RefereeNode(Node):
         self.reset_maze()
 
     # Compute the maze's world-frame bounding box from its configured corner points.
-    def bounds(self):
+    def bounds(self) -> tuple[float, float, float, float]:
+        """Computes the maze's world-frame bounding box.
+
+        Returns:
+            A tuple of (x_min, x_max, y_min, y_max), in meters.
+        """
         # All configured corners' X coordinates.
         xs = [c['x'] for name, c in self.corners.items() if isinstance(c, dict)]
         # All configured corners' Y coordinates.
@@ -58,7 +83,12 @@ class RefereeNode(Node):
         return min(xs), max(xs), min(ys), max(ys)
 
     # Generate a random maze layout as a list of wall segments in grid coordinates.
-    def generate_layout(self):
+    def generate_layout(self) -> list[list[list[int]]]:
+        """Generates a random maze layout as grid-unit wall segments.
+
+        Returns:
+            A list of [[x1, y1], [x2, y2]] wall segments, in grid units.
+        """
         # Number of cells per side of the square maze.
         n = self.corners['cells_per_side']
         # Construct a new mazelib Maze.
@@ -99,7 +129,16 @@ class RefereeNode(Node):
         return segments
 
     # Convert grid-unit wall segments into an inline Gazebo SDF model string.
-    def make_maze_sdf(self, segments):
+    def make_maze_sdf(self, segments: list[list[list[int]]]) -> str:
+        """Converts grid-unit wall segments into an inline Gazebo SDF model.
+
+        Args:
+            segments: The wall segments to render, as returned by
+                :meth:`generate_layout`.
+
+        Returns:
+            A complete SDF document string defining the maze model.
+        """
         # The maze's real-world bounding box.
         x_min, x_max, y_min, y_max = self.bounds()
         # Number of cells per side.
@@ -114,7 +153,16 @@ class RefereeNode(Node):
         cell_size_y = (y_max - y_min) / n
 
         # Convert a grid-unit (gx, gy) coordinate into world (x, y).
-        def to_world(gx, gy):
+        def to_world(gx: int, gy: int) -> tuple[float, float]:
+            """Converts a grid-unit coordinate into world (x, y).
+
+            Args:
+                gx: Grid-unit X coordinate.
+                gy: Grid-unit Y coordinate.
+
+            Returns:
+                The corresponding world-frame (x, y) point.
+            """
             # Scale and offset by the maze's real-world bounding box.
             return (x_min + gx * cell_size_x, y_min + gy * cell_size_y)
 
@@ -171,7 +219,8 @@ class RefereeNode(Node):
 </sdf>'''
 
     # Delete any existing maze entity, generate a new layout, and spawn it.
-    def reset_maze(self):
+    def reset_maze(self) -> None:
+        """Deletes any existing maze entity, generates a new layout, and spawns it."""
         # Ask Gazebo to remove the previous maze entity, if any (a no-op if it doesn't exist).
         subprocess.run([
             'gz', 'service', '-s', f'/world/{WORLD_NAME}/remove',
@@ -198,7 +247,8 @@ class RefereeNode(Node):
         self.get_logger().info('maze reset')
 
     # Timer callback: polls until the SolveMaze server is ready, then sends the first goal.
-    def try_send_solve_goal(self):
+    def try_send_solve_goal(self) -> None:
+        """Polls until the SolveMaze server is ready, then sends the first goal."""
         # A blocking wait_for_server() call before this node had ever been
         # spun didn't detect the action server coming up at all, even well
         # after it existed -- server_is_ready() is a plain non-blocking
@@ -214,7 +264,8 @@ class RefereeNode(Node):
         self.send_solve_goal()
 
     # Send one SolveMaze goal to the solver.
-    def send_solve_goal(self):
+    def send_solve_goal(self) -> None:
+        """Sends one SolveMaze goal to the solver."""
         # SolveMaze's goal carries no fields.
         goal = SolveMaze.Goal()
         # Send the goal asynchronously.
@@ -223,7 +274,12 @@ class RefereeNode(Node):
         send_future.add_done_callback(self.goal_response)
 
     # Callback for when the solver accepts or rejects a SolveMaze goal.
-    def goal_response(self, future):
+    def goal_response(self, future: Future) -> None:
+        """Reacts once the solver accepts or rejects a SolveMaze goal.
+
+        Args:
+            future: Resolves to the goal handle once the solver responds.
+        """
         # Guard against the future itself raising (e.g. server disappearing).
         try:
             # Resolve the goal handle.
@@ -250,7 +306,13 @@ class RefereeNode(Node):
             self.send_solve_goal()
 
     # Callback for when a SolveMaze goal finishes (success or failure).
-    def solve_result(self, future):
+    def solve_result(self, future: Future) -> None:
+        """Reacts once a SolveMaze goal finishes, win or lose.
+
+        Args:
+            future: Resolves to the action result wrapper once the solve
+                attempt finishes.
+        """
         # Guard against the future itself raising.
         try:
             # Unwrap the actual SolveMaze.Result payload.
@@ -269,7 +331,13 @@ class RefereeNode(Node):
             self.send_solve_goal()
 
 # Standard ROS2 Python entry point.
-def main(args=None):
+def main(args: list[str] | None = None) -> None:
+    """Initializes rclpy, spins RefereeNode, and shuts down on exit.
+
+    Args:
+        args: Command-line arguments forwarded to rclpy, or ``None`` to use
+            ``sys.argv``.
+    """
     # Initialize the rclpy context.
     r.init(args=args)
     # Construct the node.

@@ -1,3 +1,10 @@
+"""Launches robot bring-up: state publishing, controllers, and Gazebo.
+
+Processes the robot's xacro into ``robot_description``, starts
+``robot_state_publisher``, and brings up either the Gazebo simulation path
+or the real/mock hardware path, selected by the ``use_sim`` argument.
+"""
+
 # os.path, used to build config/xacro file paths.
 import os
 
@@ -23,7 +30,14 @@ from launch_ros.substitutions import FindPackageShare
 
 
 # Entry point ros2 launch calls to build this launch file's description.
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
+    """Builds the launch description for robot bring-up.
+
+    Returns:
+        The launch description: the declared arguments, robot_state_publisher,
+        the Gazebo simulation path, and the real/mock hardware path, each
+        gated by ``use_sim``/``use_fake_hardware``.
+    """
     # Resolves to whatever the use_sim argument is given.
     use_sim = LaunchConfiguration('use_sim')
     # Resolves to whatever the use_fake_hardware argument is given.

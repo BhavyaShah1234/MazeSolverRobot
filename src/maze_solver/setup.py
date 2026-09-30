@@ -1,3 +1,5 @@
+"""setuptools build script for the maze_solver ament_python package."""
+
 # os.path.join, used to build the launch-file install destination portably.
 import os
 # glob, used to find every *.launch.py file to install.
