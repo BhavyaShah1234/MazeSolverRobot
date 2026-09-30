@@ -1,21 +1,24 @@
-"""Turns a planned path into executed arm motion via MoveIt2.
+"""Traces a planned path corner by corner and returns home, as its own node.
 
-Owns the MoveIt2 Cartesian-path-planning service client and
-trajectory-execution action client, and provides the mechanics
-control_node.py's solve-cycle orchestration calls into: converting a
-planned path into oriented Cartesian waypoints, tracing them corner by
-corner (each segment its own independently time-parameterized trajectory,
-so the arm actually stops at every corner instead of carrying momentum
-through turns), and returning to the SRDF "ready" pose afterward.
+Hosts the TraceMaze action server: given a path, converts it into oriented
+Cartesian waypoints and plans/executes each corner-to-corner segment in its
+own MoveIt2 call -- so the arm actually stops at every corner instead of
+carrying momentum through turns -- then drives the arm back to the SRDF
+"ready" pose. Runs as its own process, independent of control_node, which
+calls into this node purely through the TraceMaze action rather than any
+direct Python coupling.
 """
 
-# ActionClient to call MoveIt2's execute_trajectory action.
-from rclpy.action import ActionClient
-# Base class type hint for the owning node.
+# rclpy aliased to r, matching this project's ROS2 node convention.
+import rclpy as r
+# ActionClient to call MoveIt2's execute_trajectory action; ActionServer to host TraceMaze; ServerGoalHandle for type hints.
+from rclpy.action import ActionClient, ActionServer
+from rclpy.action.server import ServerGoalHandle
+# Base class for all ROS2 nodes in rclpy.
 from rclpy.node import Node
 # Pose: individual Cartesian waypoints sent to MoveIt2.
 from geometry_msgs.msg import Pose
-# Path: the planned route received from planning_node.
+# Path: the planned route received as this node's action goal.
 from nav_msgs.msg import Path
 # JointState: the arm's live joint positions/velocities.
 from sensor_msgs.msg import JointState
@@ -27,8 +30,10 @@ from moveit_msgs.srv import GetCartesianPath
 from moveit_msgs.action import ExecuteTrajectory
 # Trajectory message types used to build the "return home" trajectory by hand.
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+# TraceMaze: this node's own action, hosted here.
+from maze_interfaces.action import TraceMaze
 
-# The MoveIt2 planning group this executor commands.
+# The MoveIt2 planning group this node commands.
 GROUP_NAME = 'fr3_arm'
 # The link MoveIt2 should trace the Cartesian path with (the laser tip).
 LINK_NAME = 'fr3_laser_link'
@@ -50,37 +55,37 @@ READY_ANGLES = [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785]
 # Duration (seconds) allotted for the "return home" trajectory.
 HOME_SECONDS = 4.0
 
-# Owns MoveIt2 clients and turns a planned path into executed motion.
-class MotionExecutor:
-    """Owns MoveIt2 clients and turns a planned path into executed motion.
+# The node that hosts the TraceMaze action and drives the arm along a path via MoveIt2.
+class MotionExecutorNode(Node):
+    """Hosts TraceMaze and drives the arm along a path via MoveIt2.
 
     Attributes:
-        node: The owning node, used to create clients/subscriptions and log.
         joint_state: The arm's most recent joint state, or ``None`` until
             the first message arrives.
         cartesian_path_client: Client for MoveIt2's Cartesian-path-planning
             service.
         execute_trajectory_client: Client for MoveIt2's
             trajectory-execution action.
+        action_server: Hosts the TraceMaze action that control_node calls.
     """
 
-    # Constructor: sets up joint-state tracking and the MoveIt2 clients.
-    def __init__(self, node: Node) -> None:
-        """Sets up joint-state tracking and the MoveIt2 clients.
-
-        Args:
-            node: The node to create subscriptions/clients on and log through.
-        """
-        # The owning node, used to create clients/subscriptions and log.
-        self.node = node
+    # Constructor: sets up joint-state tracking, the MoveIt2 clients, and the action server.
+    def __init__(self) -> None:
+        """Sets up joint-state tracking, the MoveIt2 clients, and the action server."""
+        # Register this node with rclpy under the name "motion_executor".
+        super(MotionExecutorNode, self).__init__(node_name='motion_executor')
         # The arm's most recent JointState; None until the first message arrives.
         self.joint_state: JointState | None = None
         # Subscribe to the arm's live joint states.
-        self.node.create_subscription(JointState, '/joint_states', self.joint_state_callback, 10)
+        self.create_subscription(JointState, '/joint_states', self.joint_state_callback, 10)
         # Client for MoveIt2's Cartesian-path-planning service.
-        self.cartesian_path_client = self.node.create_client(GetCartesianPath, '/compute_cartesian_path')
+        self.cartesian_path_client = self.create_client(GetCartesianPath, '/compute_cartesian_path')
         # Client for MoveIt2's trajectory-execution action.
-        self.execute_trajectory_client = ActionClient(self.node, ExecuteTrajectory, '/execute_trajectory')
+        self.execute_trajectory_client = ActionClient(self, ExecuteTrajectory, '/execute_trajectory')
+        # Hosts the TraceMaze action that control_node calls.
+        self.action_server = ActionServer(self, TraceMaze, '/trace_maze', execute_callback=self.execute_callback)
+        # Log that startup completed.
+        self.get_logger().info('motion_executor started')
 
     # Store the latest joint state whenever one arrives.
     def joint_state_callback(self, joint_state_message: JointState) -> None:
@@ -92,7 +97,7 @@ class MotionExecutor:
         # Just remember the message; used lazily elsewhere.
         self.joint_state = joint_state_message
 
-    # Read the arm's current joint angles, in this executor's fixed JOINT_NAMES order.
+    # Read the arm's current joint angles, in this node's fixed JOINT_NAMES order.
     def current_angles(self) -> list[float]:
         """Reads the arm's current joint angles, in JOINT_NAMES order.
 
@@ -190,7 +195,7 @@ class MotionExecutor:
         # Start planning from wherever the arm actually is right now -- for every
         # segment after the first, that's its rest position at the previous corner.
         request.start_state = RobotState(joint_state=self.joint_state)
-        # Plan for this executor's fixed planning group.
+        # Plan for this node's fixed planning group.
         request.group_name = GROUP_NAME
         # Trace the path with this specific link (the laser tip).
         request.link_name = LINK_NAME
@@ -279,3 +284,76 @@ class MotionExecutor:
         home_result = await self.run_trajectory(home_trajectory)
         # Report whether homing actually succeeded.
         return home_result is not None and home_result.error_code.val == 1
+
+    # The TraceMaze action's execute callback: traces the given path corner by corner, then homes.
+    async def execute_callback(self, goal_handle: ServerGoalHandle) -> TraceMaze.Result:
+        """Traces the goal's path corner by corner, then returns home.
+
+        Args:
+            goal_handle: The TraceMaze action goal handle to report feedback
+                and completion on.
+
+        Returns:
+            The result of this trace attempt.
+        """
+        # Guard the whole cycle so any failure becomes a clean action result instead of a crash.
+        try:
+            # Report the executing stage to the action client.
+            goal_handle.publish_feedback(TraceMaze.Feedback(stage='executing'))
+            # Convert the goal's path into oriented Cartesian waypoints.
+            waypoints = self.build_waypoints(goal_handle.request.path)
+            # Trace each corner-to-corner segment in turn, stopping fully at each corner.
+            for index, waypoint in enumerate(waypoints, start=1):
+                # Plan and execute this one segment.
+                failure_message = await self.trace_segment(waypoint, index, len(waypoints))
+                # Stop immediately if this segment failed.
+                if failure_message is not None:
+                    # Mark the action goal as aborted.
+                    goal_handle.abort()
+                    # Return a failure result with this segment's failure message.
+                    return TraceMaze.Result(success=False, message=failure_message)
+
+            # Report the homing stage to the action client.
+            goal_handle.publish_feedback(TraceMaze.Feedback(stage='homing'))
+            # Drive the arm back to the ready pose.
+            if not await self.go_home():
+                # Reaching the goal and tracing the maze is what matters for
+                # solving it; failing to tidily return home afterward isn't
+                # a trace failure.
+                # Log a warning, but don't fail the overall trace attempt.
+                self.get_logger().warning('failed to return home after tracing the maze')
+
+            # Mark the action goal as succeeded.
+            goal_handle.succeed()
+            # Return the successful result.
+            return TraceMaze.Result(success=True, message='trace complete')
+        # Catch anything unexpected so it becomes a clean failure result instead of a crash.
+        except Exception as exception:
+            # Mark the action goal as aborted.
+            goal_handle.abort()
+            # Return a failure result with the exception's message.
+            return TraceMaze.Result(success=False, message=str(exception))
+
+# Standard ROS2 Python entry point.
+def main(args: list[str] | None = None) -> None:
+    """Initializes rclpy, spins MotionExecutorNode, and shuts down on exit.
+
+    Args:
+        args: Command-line arguments forwarded to rclpy, or ``None`` to use
+            ``sys.argv``.
+    """
+    # Initialize the rclpy context.
+    r.init(args=args)
+    # Construct the node.
+    node = MotionExecutorNode()
+    # Block, processing callbacks, until shutdown.
+    r.spin(node)
+    # Clean up the node on exit.
+    node.destroy_node()
+    # Tear down the rclpy context.
+    r.shutdown()
+
+# Only run main() when this file is executed directly (not on import).
+if __name__ == '__main__':
+    # Invoke the entry point.
+    main()

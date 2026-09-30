@@ -7,10 +7,14 @@ project(maze_interfaces)
 find_package(ament_cmake REQUIRED)
 # Generates message/service/action code from .action/.msg/.srv files.
 find_package(rosidl_default_generators REQUIRED)
+# Provides nav_msgs/Path, used as TraceMaze's goal field type.
+find_package(nav_msgs REQUIRED)
 
-# Generate the SolveMaze action's C++/Python bindings.
+# Generate the SolveMaze and TraceMaze actions' C++/Python bindings.
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/SolveMaze.action"
+  "action/TraceMaze.action"
+  DEPENDENCIES nav_msgs
 )
 
 # Ensure packages depending on this one also get the rosidl runtime.

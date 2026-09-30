@@ -44,7 +44,7 @@ setup(
     tests_require=['pytest'],
     # Console-script entry points, one per node executable.
     entry_points={
-        # This package's three runnable nodes.
+        # This package's four runnable nodes.
         'console_scripts': [
             # Maps `ros2 run maze_solver perception_node` to perception_node.py's main().
             'perception_node = maze_solver.perception_node:main',
@@ -52,6 +52,8 @@ setup(
             'planning_node = maze_solver.planning_node:main',
             # Maps `ros2 run maze_solver control_node` to control_node.py's main().
             'control_node = maze_solver.control_node:main',
+            # Maps `ros2 run maze_solver motion_executor` to motion_executor.py's main().
+            'motion_executor = maze_solver.motion_executor:main',
         ],
     },
 )

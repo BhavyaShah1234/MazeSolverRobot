@@ -1,17 +1,17 @@
 """Hosts the SolveMaze action and orchestrates the solve cycle.
 
 Runs one digitize -> plan -> trace -> home cycle per SolveMaze goal:
-triggers perception, waits for a path, and delegates all MoveIt2 motion
-mechanics -- tracing the path corner by corner and returning to the ready
-pose -- to :class:`~maze_solver.motion_executor.MotionExecutor`, keeping
-this module focused purely on the solve-cycle sequence and its action
-bookkeeping.
+triggers perception, waits for a path, and delegates all path-tracing and
+homing to motion_executor (a separate node) via the TraceMaze action,
+relaying its feedback into this node's own SolveMaze feedback. This keeps
+control_node focused purely on the solve-cycle sequence and its action
+bookkeeping, with zero direct coupling to MoveIt2 or motion mechanics.
 """
 
 # rclpy aliased to r, matching this project's ROS2 node convention.
 import rclpy as r
-# ActionServer to host SolveMaze; ServerGoalHandle for type hints.
-from rclpy.action import ActionServer
+# ActionClient to call motion_executor's TraceMaze action; ActionServer to host SolveMaze; ServerGoalHandle for type hints.
+from rclpy.action import ActionClient, ActionServer
 from rclpy.action.server import ServerGoalHandle
 # Base class for all ROS2 nodes in rclpy.
 from rclpy.node import Node
@@ -21,38 +21,36 @@ from rclpy.task import Future
 from nav_msgs.msg import Path
 # Empty: the trigger message sent to (re)start perception.
 from std_msgs.msg import Empty
-# SolveMaze: this package's own action, hosted by this node.
-from maze_interfaces.action import SolveMaze
-# MotionExecutor: owns all MoveIt2 mechanics this node's solve cycle drives.
-from maze_solver.motion_executor import MotionExecutor
+# SolveMaze: this node's own action, hosted here; TraceMaze: motion_executor's action, called from here.
+from maze_interfaces.action import SolveMaze, TraceMaze
 
-# The node that hosts the SolveMaze action and orchestrates perception -> plan -> execute -> home.
+# The node that hosts the SolveMaze action and orchestrates perception -> plan -> trace -> home.
 class ControlNode(Node):
     """Hosts SolveMaze and orchestrates one full solve cycle per goal.
 
     Attributes:
-        motion: Owns the MoveIt2 clients and motion-execution mechanics.
         path_future: A future that resolves when the next /path message
             arrives, or ``None`` between solve attempts.
         perception_start_publisher: Publisher for the "start a new
             perception cycle" trigger.
+        trace_maze_client: Client for motion_executor's TraceMaze action.
         action_server: Hosts the SolveMaze action that the referee node
             calls.
     """
 
-    # Constructor: sets up the motion executor, subscriptions, and the action server.
+    # Constructor: sets up subscriptions, the TraceMaze client, and the action server.
     def __init__(self) -> None:
-        """Initializes the motion executor, subscriptions, and the action server."""
+        """Initializes subscriptions, the TraceMaze client, and the action server."""
         # Register this node with rclpy under the name "control_node".
         super(ControlNode, self).__init__(node_name='control_node')
-        # Owns MoveIt2 clients and the actual segment/home motion mechanics.
-        self.motion = MotionExecutor(self)
         # A Future that resolves when the next /path message arrives; None between solve attempts.
         self.path_future: Future | None = None
         # Subscribe to the planned path from planning_node.
         self.create_subscription(Path, '/path', self.path_callback, 10)
         # Publisher for the "start a new perception cycle" trigger.
         self.perception_start_publisher = self.create_publisher(Empty, '/perception/start', 10)
+        # Client for motion_executor's TraceMaze action.
+        self.trace_maze_client = ActionClient(self, TraceMaze, '/trace_maze')
         # Hosts the SolveMaze action that the referee node calls.
         self.action_server = ActionServer(self, SolveMaze, '/solve_maze', execute_callback=self.execute_callback)
         # Log that startup completed.
@@ -69,6 +67,38 @@ class ControlNode(Node):
         if self.path_future is not None and not self.path_future.done():
             # Deliver this path to whoever is awaiting path_future.
             self.path_future.set_result(path_message)
+
+    # Send the given path to motion_executor's TraceMaze action and await its result.
+    async def trace_path(self, path_message: Path, goal_handle: ServerGoalHandle) -> TraceMaze.Result:
+        """Sends a path to motion_executor and awaits the trace result.
+
+        Relays TraceMaze's own feedback (``executing``/``homing``) straight
+        into this SolveMaze goal's feedback, so a listener sees the same
+        stage sequence as before motion execution moved to its own node.
+
+        Args:
+            path_message: The path for motion_executor to trace.
+            goal_handle: The SolveMaze goal handle to relay feedback onto.
+
+        Returns:
+            motion_executor's result for this trace attempt.
+        """
+        # Build the TraceMaze goal from the planned path.
+        trace_goal = TraceMaze.Goal(path=path_message)
+        # Send the goal, relaying each TraceMaze feedback message as SolveMaze feedback.
+        trace_goal_handle = await self.trace_maze_client.send_goal_async(
+            trace_goal,
+            feedback_callback=lambda feedback: goal_handle.publish_feedback(
+                SolveMaze.Feedback(stage=feedback.feedback.stage)),
+        )
+        # motion_executor rejected the goal outright.
+        if not trace_goal_handle.accepted:
+            # Report this as a failure result, same shape as any other trace failure.
+            return TraceMaze.Result(success=False, message='motion_executor rejected the trace goal')
+        # Wait for the trace attempt to finish.
+        result = await trace_goal_handle.get_result_async()
+        # Return the actual result payload.
+        return result.result
 
     # The SolveMaze action's execute callback: runs one full digitize -> plan -> trace -> home cycle.
     async def execute_callback(self, goal_handle: ServerGoalHandle) -> SolveMaze.Result:
@@ -94,31 +124,14 @@ class ControlNode(Node):
 
             # Report the planning stage to the action client.
             goal_handle.publish_feedback(SolveMaze.Feedback(stage='planning'))
-            # Convert the planned path into oriented Cartesian waypoints.
-            waypoints = self.motion.build_waypoints(path_message)
-
-            # Report the executing stage to the action client.
-            goal_handle.publish_feedback(SolveMaze.Feedback(stage='executing'))
-            # Trace each corner-to-corner segment in turn, stopping fully at each corner.
-            for index, waypoint in enumerate(waypoints, start=1):
-                # Plan and execute this one segment.
-                failure_message = await self.motion.trace_segment(waypoint, index, len(waypoints))
-                # Stop immediately if this segment failed.
-                if failure_message is not None:
-                    # Mark the action goal as aborted.
-                    goal_handle.abort()
-                    # Return a failure result with this segment's failure message.
-                    return SolveMaze.Result(success=False, message=failure_message)
-
-            # Report the homing stage to the action client.
-            goal_handle.publish_feedback(SolveMaze.Feedback(stage='homing'))
-            # Drive the arm back to the ready pose.
-            if not await self.motion.go_home():
-                # Reaching the goal and tracing the maze is what matters for
-                # solving it; failing to tidily return home afterward isn't
-                # a solve failure.
-                # Log a warning, but don't fail the overall solve attempt.
-                self.get_logger().warning('failed to return home after solving the maze')
+            # Hand the path to motion_executor and await its trace result.
+            trace_result = await self.trace_path(path_message, goal_handle)
+            # motion_executor failed to trace the path (or to fully home, which it reports as a warning, not a failure).
+            if not trace_result.success:
+                # Mark the action goal as aborted.
+                goal_handle.abort()
+                # Return a failure result with motion_executor's own message.
+                return SolveMaze.Result(success=False, message=trace_result.message)
 
             # Mark the action goal as succeeded.
             goal_handle.succeed()

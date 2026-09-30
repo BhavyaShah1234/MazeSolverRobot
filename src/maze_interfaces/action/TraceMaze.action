@@ -1,0 +1,12 @@
+# Goal: the planned path to trace, corner by corner.
+nav_msgs/Path path
+# Separator: ends the goal section, begins the result section.
+---
+# Whether tracing the path (and returning home afterward) succeeded.
+bool success
+# Human-readable success/failure detail.
+string message
+# Separator: ends the result section, begins the feedback section.
+---
+# Which sub-stage is currently running ("executing" | "homing").
+string stage

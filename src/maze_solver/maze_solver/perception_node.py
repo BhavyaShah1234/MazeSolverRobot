@@ -88,10 +88,10 @@ class PerceptionNode(Node):
             first message arrives.
         triggered: Whether this perception run has already locked onto a
             stable, trusted frame.
-        candidate_data: The most recent mask, kept to compare against the
+        previous_frame: The most recent mask, kept to compare against the
             next frame for stability.
         stable_count: How many consecutive frames have matched
-            ``candidate_data`` so far.
+            ``previous_frame`` so far.
         frozen_grid: The grid message computed once ``triggered`` is
             ``True``, republished every frame after that.
         frozen_goals: The goals message computed once ``triggered`` is
@@ -115,8 +115,8 @@ class PerceptionNode(Node):
         # Whether this perception run has already locked onto a stable, trusted frame.
         self.triggered: bool = False
         # The most recent mask, kept to compare against the next frame for stability.
-        self.candidate_data: list | None = None
-        # How many consecutive frames have matched candidate_data so far.
+        self.previous_frame: list | None = None
+        # How many consecutive frames have matched previous_frame so far.
         self.stable_count: int = 0
         # The grid message computed once triggered==True, republished every frame after that.
         self.frozen_grid: OccupancyGrid | None = None
@@ -162,7 +162,7 @@ class PerceptionNode(Node):
         # Clear the "already locked on" flag.
         self.triggered = False
         # Forget the previous candidate frame data.
-        self.candidate_data = None
+        self.previous_frame = None
         # Reset the stability counter.
         self.stable_count = 0
         # Drop any previously frozen grid.
@@ -437,12 +437,12 @@ class PerceptionNode(Node):
             # arm sitting still that long only happens before motion starts
             # or once it's safely back at rest between mazes.
             # If this mask matches the previous candidate, extend the stability streak.
-            if mask_data == self.candidate_data:
+            if mask_data == self.previous_frame:
                 # One more frame agreeing with the candidate.
                 self.stable_count += 1
             else:
                 # A different mask -- restart the stability streak with this one as the new candidate.
-                self.candidate_data = mask_data
+                self.previous_frame = mask_data
                 # Reset the streak to 1 (this frame itself).
                 self.stable_count = 1
             # Enough consecutive matching frames -- trust this mask and lock on.

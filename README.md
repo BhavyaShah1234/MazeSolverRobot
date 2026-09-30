@@ -34,12 +34,12 @@ while `maze_ws` stays a lean, project-scoped workspace on top of it.
 
 | Package | What it is |
 |---|---|
-| `maze_interfaces` | `SolveMaze` action -- the one interface between the simulation-side referee and the solver |
+| `maze_interfaces` | `SolveMaze` action (referee -> solver) and `TraceMaze` action (the solver's own control -> motion-execution interface) |
 | `maze_description` | The FR3 + laser-rangefinder xacro. Base pose and the sim/hardware switch are plain xacro arguments, not something patched into the URDF after processing |
 | `maze_moveit_config` | SRDF, kinematics/joint-limits/OMPL config, and `move_group` launch, built with `MoveItConfigsBuilder` |
 | `maze_bringup` | Robot bring-up: `robot_state_publisher`, `ros2_control` controllers, and the `use_sim` argument that switches between Gazebo and real/mock hardware |
 | `maze_gazebo` | Sim-only: world, overhead camera model, maze wall generation, and the referee node that spawns a maze and calls `SolveMaze` in a loop |
-| `maze_solver` | Hardware-agnostic: perception (camera -> metric occupancy grid), planning (A* + path simplification), and control (MoveIt2 Cartesian path + execution) |
+| `maze_solver` | Hardware-agnostic, four nodes: perception (camera -> metric occupancy grid), planning (A* + path simplification), control (solve-cycle orchestration, `SolveMaze` server), and motion execution (MoveIt2 Cartesian path + execution, `TraceMaze` server) |
 
 ## Quick start (simulation)
 
@@ -71,7 +71,7 @@ ros2 launch maze_solver maze_solver.launch.py use_sim_time:=false
 
 No `maze_gazebo` involved, and nothing in `maze_solver` needs editing: `perception_node` reads
 the camera's live TF pose and each image's own `header.frame_id` rather than a hardcoded
-Gazebo-scoped name, and `control_node` talks to MoveIt2 and `/joint_states` the same way
+Gazebo-scoped name, and `motion_executor` talks to MoveIt2 and `/joint_states` the same way
 regardless of what's underneath. You'd need a real camera node publishing
 `sensor_msgs/Image`+`CameraInfo` on `/overhead_camera/...` with a genuine, tf-published frame
 (any name), mounted so it can see the maze from directly overhead. This hasn't been tested

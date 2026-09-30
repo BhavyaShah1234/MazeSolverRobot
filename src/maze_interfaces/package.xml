@@ -8,7 +8,7 @@
   <!-- Package version. -->
   <version>0.1.0</version>
   <!-- Human-readable summary of what this package does. -->
-  <description>Action interface between the maze referee (simulation) and the maze solver (hardware-agnostic): SolveMaze</description>
+  <description>Action interfaces used across the maze-solving stack: SolveMaze (referee -> control_node) and TraceMaze (control_node -> motion_executor)</description>
   <!-- Package maintainer, with contact email. -->
   <maintainer email="bshah43@asu.edu">Bhavya Shah</maintainer>
   <!-- License this package is distributed under. -->
@@ -16,11 +16,13 @@
 
   <!-- This is an ament_cmake package. -->
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <!-- Needed at build time to generate the SolveMaze action's bindings. -->
+  <!-- Needed at build time to generate the SolveMaze/TraceMaze actions' bindings. -->
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <!-- Needed at runtime by anything using the generated SolveMaze bindings. -->
+  <!-- Needed at runtime by anything using the generated SolveMaze/TraceMaze bindings. -->
   <exec_depend>rosidl_default_runtime</exec_depend>
+  <!-- Provides nav_msgs/Path, used as TraceMaze's goal field type. -->
+  <depend>nav_msgs</depend>
 
   <!-- Marks this as an interface-only package, for tooling that treats those specially. -->
   <member_of_group>rosidl_interface_packages</member_of_group>

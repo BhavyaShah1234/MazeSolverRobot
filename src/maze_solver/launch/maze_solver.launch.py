@@ -1,7 +1,7 @@
 """Launches the hardware-agnostic maze-solving node stack.
 
-Starts perception_node, planning_node, and control_node together, all
-sharing a single ``use_sim_time`` argument.
+Starts perception_node, planning_node, control_node, and motion_executor
+together, all sharing a single ``use_sim_time`` argument.
 """
 
 # Base class for a launch file's returned description.
@@ -20,11 +20,11 @@ def generate_launch_description() -> LaunchDescription:
 
     Returns:
         The launch description: one ``use_sim_time`` argument plus the
-        three solver nodes.
+        four solver nodes.
     """
     # Resolves to whatever value the use_sim_time argument is given.
     use_sim_time = LaunchConfiguration('use_sim_time')
-    # Return the full description: one launch argument plus the three solver nodes.
+    # Return the full description: one launch argument plus the four solver nodes.
     return LaunchDescription([
         # Defaults to true (simulation); pass false for real hardware.
         DeclareLaunchArgument('use_sim_time', default_value='true'),
@@ -34,4 +34,6 @@ def generate_launch_description() -> LaunchDescription:
         Node(package='maze_solver', executable='planning_node', output='screen', parameters=[{'use_sim_time': use_sim_time}]),
         # Launch control_node, forwarding use_sim_time.
         Node(package='maze_solver', executable='control_node', output='screen', parameters=[{'use_sim_time': use_sim_time}]),
+        # Launch motion_executor, forwarding use_sim_time.
+        Node(package='maze_solver', executable='motion_executor', output='screen', parameters=[{'use_sim_time': use_sim_time}]),
     ])
