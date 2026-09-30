@@ -69,8 +69,7 @@ class MotionExecutor:
         """Sets up joint-state tracking and the MoveIt2 clients.
 
         Args:
-            node: The node to create subscriptions/clients on and log
-                through.
+            node: The node to create subscriptions/clients on and log through.
         """
         # The owning node, used to create clients/subscriptions and log.
         self.node = node
