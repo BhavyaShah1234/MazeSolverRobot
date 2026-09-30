@@ -1,54 +1,84 @@
+# Which planning plugin move_group loads for the "ompl" pipeline.
 planning_plugins:
+  # The standard OMPL-backed MoveIt2 planner plugin.
   - ompl_interface/OMPLPlanner
 # The order of the elements in the adapter corresponds to the order they are processed by the motion planning pipeline.
+# Adapters that run before planning, in order.
 request_adapters:
+  # Resolves constraint frames relative to the planning frame.
   - default_planning_request_adapters/ResolveConstraintFrames
+  # Rejects requests whose workspace bounds are invalid.
   - default_planning_request_adapters/ValidateWorkspaceBounds
+  # Rejects requests whose start state is out of joint bounds.
   - default_planning_request_adapters/CheckStartStateBounds
+  # Rejects requests whose start state is already in collision.
   - default_planning_request_adapters/CheckStartStateCollision
+# Adapters that run after planning, in order.
 response_adapters:
+  # Retimes the raw geometric path with time-optimal parameterization.
   - default_planning_response_adapters/AddTimeOptimalParameterization
+  # Sanity-checks the final solution before returning it.
   - default_planning_response_adapters/ValidateSolution
+  # Publishes the solution for RViz's MotionPlanning display to show.
   - default_planning_response_adapters/DisplayMotionPath
+# The full catalog of OMPL planner configurations available to any group below.
 planner_configs:
+  # Single-query Bidirectional Lazy planner.
   SBLkConfigDefault:
+    # OMPL planner class.
     type: geometric::SBL
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
+  # Expansive Space Trees planner.
   ESTkConfigDefault:
+    # OMPL planner class.
     type: geometric::EST
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0 setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability. default: 0.05
+  # Lazy Bi-directional KPIECE planner.
   LBKPIECEkConfigDefault:
+    # OMPL planner class.
     type: geometric::LBKPIECE
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     border_fraction: 0.9  # Fraction of time focused on boarder default: 0.9
     min_valid_path_fraction: 0.5  # Accept partially valid moves above fraction. default: 0.5
+  # Bi-directional KPIECE planner.
   BKPIECEkConfigDefault:
+    # OMPL planner class.
     type: geometric::BKPIECE
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     border_fraction: 0.9  # Fraction of time focused on boarder default: 0.9
     failed_expansion_score_factor: 0.5  # When extending motion fails, scale score by factor. default: 0.5
     min_valid_path_fraction: 0.5  # Accept partially valid moves above fraction. default: 0.5
+  # Kinematic Planning by Interior-Exterior Cell Exploration planner.
   KPIECEkConfigDefault:
+    # OMPL planner class.
     type: geometric::KPIECE
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability. default: 0.05
     border_fraction: 0.9  # Fraction of time focused on boarder default: 0.9 (0.0,1.]
     failed_expansion_score_factor: 0.5  # When extending motion fails, scale score by factor. default: 0.5
     min_valid_path_fraction: 0.5  # Accept partially valid moves above fraction. default: 0.5
+  # Rapidly-exploring Random Tree planner.
   RRTkConfigDefault:
+    # OMPL planner class.
     type: geometric::RRT
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability? default: 0.05
+  # Bi-directional RRT planner (the one this project's move_group.launch.py actually plans with by default).
   RRTConnectkConfigDefault:
+    # OMPL planner class.
     type: geometric::RRTConnect
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
+  # Asymptotically-optimal RRT variant.
   RRTstarkConfigDefault:
+    # OMPL planner class.
     type: geometric::RRTstar
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability? default: 0.05
     delay_collision_checking: 1  # Stop collision checking as soon as C-free parent found. default 1
+  # Transition-based RRT planner.
   TRRTkConfigDefault:
+    # OMPL planner class.
     type: geometric::TRRT
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability? default: 0.05
@@ -59,12 +89,18 @@ planner_configs:
     frountier_threshold: 0.0  # dist new state to nearest neighbor to disqualify as frontier. default: 0.0 set in setup()
     frountierNodeRatio: 0.1  # 1/10, or 1 nonfrontier for every 10 frontier. default: 0.1
     k_constant: 0.0  # value used to normalize expresssion. default: 0.0 set in setup()
+  # Probabilistic Roadmap Method planner.
   PRMkConfigDefault:
+    # OMPL planner class.
     type: geometric::PRM
     max_nearest_neighbors: 10  # use k nearest neighbors. default: 10
+  # Asymptotically-optimal PRM variant.
   PRMstarkConfigDefault:
+    # OMPL planner class.
     type: geometric::PRMstar
+  # Fast Marching Tree planner.
   FMTkConfigDefault:
+    # OMPL planner class.
     type: geometric::FMT
     num_samples: 1000  # number of states that the planner should sample. default: 1000
     radius_multiplier: 1.1  # multiplier used for the nearest neighbors search radius. default: 1.1
@@ -72,7 +108,9 @@ planner_configs:
     cache_cc: 1  # use collision checking cache. default: 1
     heuristics: 0  # activate cost to go heuristics. default: 0
     extended_fmt: 1  # activate the extended FMT*: adding new samples if planner does not finish successfully. default: 1
+  # Bidirectional Fast Marching Tree planner.
   BFMTkConfigDefault:
+    # OMPL planner class.
     type: geometric::BFMT
     num_samples: 1000  # number of states that the planner should sample. default: 1000
     radius_multiplier: 1.0  # multiplier used for the nearest neighbors search radius. default: 1.0
@@ -82,9 +120,13 @@ planner_configs:
     heuristics: 1  # activates cost to go heuristics. default: 1
     cache_cc: 1  # use the collision checking cache. default: 1
     extended_fmt: 1  # Activates the extended FMT*: adding new samples if planner does not finish successfully. default: 1
+  # Path-Directed Subdivision Tree planner.
   PDSTkConfigDefault:
+    # OMPL planner class.
     type: geometric::PDST
+  # Search Tree with Resolution Independent Density Estimation planner.
   STRIDEkConfigDefault:
+    # OMPL planner class.
     type: geometric::STRIDE
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability. default: 0.05
@@ -95,7 +137,9 @@ planner_configs:
     max_pts_per_leaf: 6  # max points per leaf in the GNAT. default: 6
     estimated_dimension: 0.0  # estimated dimension of the free space. default: 0.0
     min_valid_path_fraction: 0.2  # Accept partially valid moves above fraction. default: 0.2
+  # Bi-directional Transition-based RRT planner.
   BiTRRTkConfigDefault:
+    # OMPL planner class.
     type: geometric::BiTRRT
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     temp_change_factor: 0.1  # how much to increase or decrease temp. default: 0.1
@@ -103,39 +147,59 @@ planner_configs:
     frountier_threshold: 0.0  # dist new state to nearest neighbor to disqualify as frontier. default: 0.0 set in setup()
     frountier_node_ratio: 0.1  # 1/10, or 1 nonfrontier for every 10 frontier. default: 0.1
     cost_threshold: 1e300  # the cost threshold. Any motion cost that is not better will not be expanded. default: inf
+  # Lower-Bound-estimation Transition-based RRT planner.
   LBTRRTkConfigDefault:
+    # OMPL planner class.
     type: geometric::LBTRRT
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability. default: 0.05
     epsilon: 0.4  # optimality approximation factor. default: 0.4
+  # Bi-directional EST planner.
   BiESTkConfigDefault:
+    # OMPL planner class.
     type: geometric::BiEST
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
+  # Projection-based EST planner.
   ProjESTkConfigDefault:
+    # OMPL planner class.
     type: geometric::ProjEST
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
     goal_bias: 0.05  # When close to goal select goal, with this probability. default: 0.05
+  # Lazily-evaluated PRM planner.
   LazyPRMkConfigDefault:
+    # OMPL planner class.
     type: geometric::LazyPRM
     range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
+  # Asymptotically-optimal lazy PRM variant.
   LazyPRMstarkConfigDefault:
+    # OMPL planner class.
     type: geometric::LazyPRMstar
+  # Sparse Roadmap Spanner planner.
   SPARSkConfigDefault:
+    # OMPL planner class.
     type: geometric::SPARS
     stretch_factor: 3.0  # roadmap spanner stretch factor. multiplicative upper bound on path quality. It does not make sense to make this parameter more than 3. default: 3.0
     sparse_delta_fraction: 0.25  # delta fraction for connection distance. This value represents the visibility range of sparse samples. default: 0.25
     dense_delta_fraction: 0.001  # delta fraction for interface detection. default: 0.001
     max_failures: 1000  # maximum consecutive failure limit. default: 1000
+  # Second-generation Sparse Roadmap Spanner planner.
   SPARStwokConfigDefault:
+    # OMPL planner class.
     type: geometric::SPARStwo
     stretch_factor: 3.0  # roadmap spanner stretch factor. multiplicative upper bound on path quality. It does not make sense to make this parameter more than 3. default: 3.0
     sparse_delta_fraction: 0.25  # delta fraction for connection distance. This value represents the visibility range of sparse samples. default: 0.25
     dense_delta_fraction: 0.001  # delta fraction for interface detection. default: 0.001
     max_failures: 5000  # maximum consecutive failure limit. default: 5000
+  # Trajectory-optimization-based planner.
   TrajOptDefault:
+    # OMPL planner class.
     type: geometric::TrajOpt
 
+# Planner list for the upstream Panda example's arm-only group (unused by this
+# project's own "fr3_arm" group, carried over from the source file this was
+# copied from).
 panda_arm:
+  # Every planner config above is made available to this group.
   planner_configs:
     - SBLkConfigDefault
     - ESTkConfigDefault
@@ -161,7 +225,9 @@ panda_arm:
     - SPARSkConfigDefault
     - SPARStwokConfigDefault
     - TrajOptDefault
+# Planner list for the upstream Panda example's arm+hand group (also unused here, same reason).
 panda_arm_hand:
+  # Every planner config above is made available to this group.
   planner_configs:
     - SBLkConfigDefault
     - ESTkConfigDefault

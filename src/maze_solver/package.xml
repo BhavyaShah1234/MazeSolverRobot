@@ -1,34 +1,61 @@
 <?xml version="1.0"?>
+<!-- Points editors/validators at the ROS2 package.xml format 3 schema. -->
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!-- Root element: declares this directory as a ROS2 package using format 3. -->
 <package format="3">
+  <!-- This package's name, as referenced by ros2 run/launch and other packages' dependencies. -->
   <name>maze_solver</name>
+  <!-- Package version. -->
   <version>0.1.0</version>
+  <!-- Human-readable summary of what this package does. -->
   <description>Hardware-agnostic maze perception, planning, and control: perceives the maze from an overhead camera, plans a path through it, and drives the arm along it via MoveIt2 -- no simulation-specific dependencies</description>
+  <!-- Package maintainer, with contact email. -->
   <maintainer email="bshah43@asu.edu">Bhavya Shah</maintainer>
+  <!-- License this package is distributed under. -->
   <license>Apache 2.0</license>
 
+  <!-- This is a pure-Python (ament_python) package, not ament_cmake. -->
   <buildtool_depend>ament_python</buildtool_depend>
 
+  <!-- Core ROS2 Python client library. -->
   <exec_depend>rclpy</exec_depend>
+  <!-- Used to resolve other packages' share directories at runtime. -->
   <exec_depend>ament_index_python</exec_depend>
+  <!-- Provides the SolveMaze action this package's control_node hosts. -->
   <exec_depend>maze_interfaces</exec_depend>
+  <!-- Image/CameraInfo/JointState message types. -->
   <exec_depend>sensor_msgs</exec_depend>
+  <!-- OccupancyGrid/Path message types. -->
   <exec_depend>nav_msgs</exec_depend>
+  <!-- Pose/PoseArray/PoseStamped message types. -->
   <exec_depend>geometry_msgs</exec_depend>
+  <!-- Empty message type, used as the perception-start trigger. -->
   <exec_depend>std_msgs</exec_depend>
+  <!-- JointTrajectory/JointTrajectoryPoint message types. -->
   <exec_depend>trajectory_msgs</exec_depend>
+  <!-- MoveIt2's own service/action/message types (GetCartesianPath, ExecuteTrajectory, RobotState). -->
   <exec_depend>moveit_msgs</exec_depend>
+  <!-- TF2 client library, used to look up the camera's live pose. -->
   <exec_depend>tf2_ros</exec_depend>
+  <!-- Converts ROS Image messages to OpenCV arrays and back. -->
   <exec_depend>cv_bridge</exec_depend>
+  <!-- OpenCV Python bindings, used for color masking and morphology. -->
   <exec_depend>python3-opencv</exec_depend>
+  <!-- NumPy, used throughout for array/vector math. -->
   <exec_depend>python3-numpy</exec_depend>
 
+  <!-- Lint check: copyright headers. -->
   <test_depend>ament_copyright</test_depend>
+  <!-- Lint check: flake8 style rules. -->
   <test_depend>ament_flake8</test_depend>
+  <!-- Lint check: PEP 257 docstring conventions. -->
   <test_depend>ament_pep257</test_depend>
+  <!-- Test runner used by ament for this package's tests. -->
   <test_depend>python3-pytest</test_depend>
 
+  <!-- ament-specific package metadata. -->
   <export>
+    <!-- Declares this package's build type to the ament build system. -->
     <build_type>ament_python</build_type>
   </export>
 </package>

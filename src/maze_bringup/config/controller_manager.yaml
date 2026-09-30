@@ -6,6 +6,9 @@
 # gz_ros2_control plugin embeds (sim), which already knows joint_state_broadcaster's
 # type from franka_arm.ros2_control.xacro's own hardcoded example-controllers
 # config.
+# Root key: settings for the controller_manager node itself.
 controller_manager:
+  # ROS2 parameter namespace.
   ros__parameters:
+    # How often the control loop runs, in Hz.
     update_rate: 1000  # Hz

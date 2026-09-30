@@ -7,69 +7,108 @@
   system that drives sensor rendering simply isn't loaded in the plain
   empty.sdf world used by franka_gazebo_bringup's example launch files.
 -->
+<!-- Root SDF element, version 1.6 (matching the stock empty.sdf world). -->
 <sdf version="1.6">
+  <!-- The single world defined in this file. -->
   <world name="empty">
+    <!-- Physics engine step size/real-time-factor configuration. -->
     <physics name="1ms" type="ignored">
+      <!-- Simulation step size, in seconds. -->
       <max_step_size>0.001</max_step_size>
+      <!-- Target real-time factor (1.0 = real time). -->
       <real_time_factor>1.0</real_time_factor>
     </physics>
+    <!-- Physics engine system plugin. -->
     <plugin
       filename="gz-sim-physics-system"
       name="gz::sim::systems::Physics">
     </plugin>
+    <!-- Enables user commands (e.g. spawning/removing entities at runtime). -->
     <plugin
       filename="gz-sim-user-commands-system"
       name="gz::sim::systems::UserCommands">
     </plugin>
+    <!-- Broadcasts scene/entity changes to connected GUI clients. -->
     <plugin
       filename="gz-sim-scene-broadcaster-system"
       name="gz::sim::systems::SceneBroadcaster">
     </plugin>
+    <!-- Enables contact/collision sensing. -->
     <plugin
       filename="gz-sim-contact-system"
       name="gz::sim::systems::Contact">
     </plugin>
+    <!-- The sensor-rendering system this world adds on top of the stock empty.sdf. -->
     <plugin
       filename="gz-sim-sensors-system"
       name="gz::sim::systems::Sensors">
+      <!-- Rendering engine used to actually render camera/depth sensor data. -->
       <render_engine>ogre2</render_engine>
     </plugin>
 
+    <!-- The world's single directional light (the sun). -->
     <light type="directional" name="sun">
+      <!-- This light casts shadows. -->
       <cast_shadows>true</cast_shadows>
+      <!-- Light position/orientation. -->
       <pose>0 0 10 0 0 0</pose>
+      <!-- Diffuse color. -->
       <diffuse>0.8 0.8 0.8 1</diffuse>
+      <!-- Specular color. -->
       <specular>0.2 0.2 0.2 1</specular>
+      <!-- Light attenuation over distance. -->
       <attenuation>
+        <!-- Maximum range the light affects. -->
         <range>1000</range>
+        <!-- Constant attenuation term. -->
         <constant>0.9</constant>
+        <!-- Linear attenuation term. -->
         <linear>0.01</linear>
+        <!-- Quadratic attenuation term. -->
         <quadratic>0.001</quadratic>
       </attenuation>
+      <!-- Direction the light shines. -->
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
+    <!-- The flat ground plane every other model sits on. -->
     <model name="ground_plane">
+      <!-- The ground never moves. -->
       <static>true</static>
+      <!-- The ground plane's single link. -->
       <link name="link">
+        <!-- Collision geometry for physics. -->
         <collision name="collision">
+          <!-- Geometry source. -->
           <geometry>
+            <!-- An infinite (practically 100x100 m) flat plane. -->
             <plane>
+              <!-- Plane normal, pointing straight up. -->
               <normal>0 0 1</normal>
+              <!-- Plane size, in meters. -->
               <size>100 100</size>
             </plane>
           </geometry>
         </collision>
+        <!-- Visual geometry, matching the collision geometry. -->
         <visual name="visual">
+          <!-- Geometry source. -->
           <geometry>
+            <!-- Same flat plane as the collision geometry. -->
             <plane>
+              <!-- Plane normal, pointing straight up. -->
               <normal>0 0 1</normal>
+              <!-- Plane size, in meters. -->
               <size>100 100</size>
             </plane>
           </geometry>
+          <!-- Ground plane material. -->
           <material>
+            <!-- Ambient color. -->
             <ambient>0.8 0.8 0.8 1</ambient>
+            <!-- Diffuse color. -->
             <diffuse>0.8 0.8 0.8 1</diffuse>
+            <!-- Specular color. -->
             <specular>0.8 0.8 0.8 1</specular>
           </material>
         </visual>

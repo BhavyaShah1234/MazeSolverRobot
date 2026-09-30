@@ -1,18 +1,34 @@
+# Which controller-manager plugin MoveIt2 uses to talk to ros2_control.
 moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
 
+# Configuration for that simple controller manager.
 moveit_simple_controller_manager:
+  # The list of controllers MoveIt2 is allowed to command.
   controller_names:
+    # The one controller this project uses.
     - joint_trajectory_controller
 
+  # Details of the joint_trajectory_controller entry above.
   joint_trajectory_controller:
+    # Action namespace this controller's FollowJointTrajectory action lives under.
     action_ns: follow_joint_trajectory
+    # Action interface type MoveIt2 should use to command this controller.
     type: FollowJointTrajectory
+    # Use this controller by default when no controller is explicitly requested.
     default: true
+    # The joints this controller (and therefore this MoveIt2 config) commands.
     joints:
+      # FR3 joint 1.
       - fr3_joint1
+      # FR3 joint 2.
       - fr3_joint2
+      # FR3 joint 3.
       - fr3_joint3
+      # FR3 joint 4.
       - fr3_joint4
+      # FR3 joint 5.
       - fr3_joint5
+      # FR3 joint 6.
       - fr3_joint6
+      # FR3 joint 7.
       - fr3_joint7

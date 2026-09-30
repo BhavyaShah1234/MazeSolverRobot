@@ -1,7 +1,12 @@
 # Goal: empty -- perception re-digitizes whatever the camera currently sees
 # when this goal is accepted; there is nothing else to configure per-solve.
+# Separator: ends the (empty) goal section, begins the result section.
 ---
+# Whether the maze was solved successfully.
 bool success
+# Human-readable success/failure detail.
 string message
+# Separator: ends the result section, begins the feedback section.
 ---
+# Which stage of the solve cycle is currently running.
 string stage

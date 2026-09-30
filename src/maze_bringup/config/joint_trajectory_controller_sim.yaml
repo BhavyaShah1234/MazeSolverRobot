@@ -12,21 +12,37 @@
 # every other parameter below) directly on the running controller_manager
 # node before loading it, which is the standard, supported way to add a
 # controller a Gazebo plugin's own startup config doesn't know about.
+# Root key: this controller's own parameters.
 joint_trajectory_controller:
+  # ROS2 parameter namespace.
   ros__parameters:
+    # The controller plugin class to load.
     type: joint_trajectory_controller/JointTrajectoryController
+    # The joints this controller commands.
     joints:
+      # FR3 joint 1.
       - fr3_joint1
+      # FR3 joint 2.
       - fr3_joint2
+      # FR3 joint 3.
       - fr3_joint3
+      # FR3 joint 4.
       - fr3_joint4
+      # FR3 joint 5.
       - fr3_joint5
+      # FR3 joint 6.
       - fr3_joint6
+      # FR3 joint 7.
       - fr3_joint7
+    # Which command interface this controller writes to.
     command_interfaces:
+      # Position commands, matching Gazebo's exported interface.
       - position
+    # Which state interfaces this controller reads from.
     state_interfaces:
+      # Current position.
       - position
+      # Current velocity.
       - velocity
     # The control node sends position-only waypoints (no velocities), so the
     # default "splines" interpolation has to invent smooth velocities at each
@@ -36,4 +52,5 @@ joint_trajectory_controller:
     # even though every individual waypoint was solved to be wall-free, while
     # linear interpolation between the same waypoints never left the
     # corridor. "none" here means linear, not "no interpolation".
+    # Use linear interpolation between waypoints instead of splines.
     interpolation_method: "none"

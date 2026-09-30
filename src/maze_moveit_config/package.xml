@@ -1,28 +1,49 @@
 <?xml version="1.0"?>
+<!-- Points editors/validators at the ROS2 package.xml format 3 schema. -->
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!-- Root element: declares this directory as a ROS2 package using format 3. -->
 <package format="3">
+  <!-- This package's name, as referenced by ros2 run/launch and other packages' dependencies. -->
   <name>maze_moveit_config</name>
+  <!-- Package version. -->
   <version>0.1.0</version>
+  <!-- Human-readable summary of what this package does. -->
   <description>MoveIt2 configuration for the maze-solving FR3 + laser end effector: SRDF, kinematics/joint-limits/OMPL config, and move_group launch</description>
+  <!-- Package maintainer, with contact email. -->
   <maintainer email="bshah43@asu.edu">Bhavya Shah</maintainer>
+  <!-- License this package is distributed under. -->
   <license>Apache 2.0</license>
 
+  <!-- This is a plain ament_cmake package (config/launch/rviz files only, no compiled code). -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- Provides the xacro this package's launch file processes into robot_description. -->
   <exec_depend>maze_description</exec_depend>
+  <!-- The Python library used to assemble the MoveIt2 configuration in move_group.launch.py. -->
   <exec_depend>moveit_configs_utils</exec_depend>
+  <!-- Provides the move_group executable. -->
   <exec_depend>moveit_ros_move_group</exec_depend>
+  <!-- Core MoveIt2 planning-scene/monitor support. -->
   <exec_depend>moveit_ros_planning</exec_depend>
+  <!-- Provides the KDL kinematics plugin used in kinematics.yaml. -->
   <exec_depend>moveit_kinematics</exec_depend>
+  <!-- Provides the OMPL planning plugin used in ompl_planning.yaml. -->
   <exec_depend>moveit_planners_ompl</exec_depend>
+  <!-- Provides the controller-manager plugin used in moveit_controllers.yaml. -->
   <exec_depend>moveit_simple_controller_manager</exec_depend>
+  <!-- Provides the rviz2 executable this package's launch file starts. -->
   <exec_depend>rviz2</exec_depend>
+  <!-- Provides MoveIt2's RViz plugins (MotionPlanning, PlanningScene). -->
   <exec_depend>moveit_ros_visualization</exec_depend>
 
+  <!-- ament's automatic lint-test discovery. -->
   <test_depend>ament_lint_auto</test_depend>
+  <!-- The standard set of ament lint checks. -->
   <test_depend>ament_lint_common</test_depend>
 
+  <!-- ament-specific package metadata. -->
   <export>
+    <!-- Declares this package's build type to the ament build system. -->
     <build_type>ament_cmake</build_type>
   </export>
 </package>

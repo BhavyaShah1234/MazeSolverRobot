@@ -4,10 +4,13 @@
 # the maze, the robot's pose isn't a simulation-only detail, and a real FR3
 # deployment needs the same argument without any of this package.
 
+# Root key for all overhead-camera configuration.
 overhead_camera:
   # Horizontal position, in meters, in the world frame. x is centered over
   # the maze's x-span (corners span x in [0.1, 0.7], so midpoint 0.4).
+  # Camera's world-frame X position.
   x: 0.4
+  # Camera's world-frame Y position (centered on the maze's y-span).
   y: 0.0
 
   # Height, in meters, is robot_height_m + clearance_m:
@@ -22,15 +25,20 @@ overhead_camera:
   #    fitting the maze's 0.6 x 0.6 m square in frame. Minimum height to fit
   #    it at all is ~0.69 m; 0.20 clearance (~0.90 m total) leaves margin
   #    around the edges.
+  # Highest point of the arm's default ready pose, from forward kinematics.
   robot_height_m: 0.697
+  # How far above the arm's highest point the camera sits.
   clearance_m: 0.20
 
   # Orientation, in radians (roll, pitch, yaw). pitch = pi/2 (1.5707963)
   # points the camera's optical axis (local +X) straight down at the floor.
   # Change yaw to rotate the image; change roll/pitch away from this value
   # to tilt the view off-vertical.
+  # Camera roll.
   roll: 3.14159
+  # Camera pitch (straight down).
   pitch: 1.5707963
+  # Camera yaw.
   yaw: 0.0
 
 # Corners of the square the generated maze is rendered onto: grid x in
@@ -43,22 +51,38 @@ overhead_camera:
 # out) -- 3 points are all the referee node needs to derive the square's
 # bounds, and the robot's spawn position is such that the 4th corner would
 # sit outside the arm's comfortable reach.
+# Root key for all maze layout/sizing configuration.
 maze:
+  # Number of cells per side of the square maze grid.
   cells_per_side: 10
+  # Thickness of each generated wall segment, in meters.
   wall_thickness_m: 0.006
+  # Height of each generated wall segment, in meters.
   wall_height_m: 0.03
 
+  # The maze square's top-left corner.
   top_left:
+    # Top-left corner's X coordinate.
     x: 0.1
+    # Top-left corner's Y coordinate.
     y: 0.3
+    # Top-left corner's Z coordinate.
     z: 0.02
 
+  # The maze square's top-right corner.
   top_right:
+    # Top-right corner's X coordinate.
     x: 0.7
+    # Top-right corner's Y coordinate.
     y: 0.3
+    # Top-right corner's Z coordinate.
     z: 0.02
 
+  # The maze square's bottom-left corner.
   bottom_left:
+    # Bottom-left corner's X coordinate.
     x: 0.1
+    # Bottom-left corner's Y coordinate.
     y: -0.3
+    # Bottom-left corner's Z coordinate.
     z: 0.02

@@ -1,27 +1,47 @@
 <?xml version="1.0"?>
+<!-- Points editors/validators at the ROS2 package.xml format 3 schema. -->
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!-- Root element: declares this directory as a ROS2 package using format 3. -->
 <package format="3">
+  <!-- This package's name, as referenced by ros2 run/launch and other packages' dependencies. -->
   <name>maze_bringup</name>
+  <!-- Package version. -->
   <version>0.1.0</version>
+  <!-- Human-readable summary of what this package does. -->
   <description>Robot bring-up: robot_state_publisher, ros2_control controllers, and the use_sim switch between Gazebo and real/mock hardware</description>
+  <!-- Package maintainer, with contact email. -->
   <maintainer email="bshah43@asu.edu">Bhavya Shah</maintainer>
+  <!-- License this package is distributed under. -->
   <license>Apache 2.0</license>
 
+  <!-- This is a plain ament_cmake package (config/launch files only, no compiled code). -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- Provides the xacro this package processes into robot_description. -->
   <exec_depend>maze_description</exec_depend>
+  <!-- Provides the Gazebo world/camera/referee launch this package includes when simulating. -->
   <exec_depend>maze_gazebo</exec_depend>
+  <!-- Publishes /robot_description and /tf. -->
   <exec_depend>robot_state_publisher</exec_depend>
+  <!-- Hosts the standalone controller_manager for the real-hardware path. -->
   <exec_depend>controller_manager</exec_depend>
+  <!-- Broadcasts /joint_states. -->
   <exec_depend>joint_state_broadcaster</exec_depend>
+  <!-- Drives the arm along commanded trajectories. -->
   <exec_depend>joint_trajectory_controller</exec_depend>
+  <!-- Spawns the robot model into Gazebo. -->
   <exec_depend>ros_gz_sim</exec_depend>
+  <!-- Processes the robot's xacro into a URDF at launch time. -->
   <exec_depend>xacro</exec_depend>
 
+  <!-- ament's automatic lint-test discovery. -->
   <test_depend>ament_lint_auto</test_depend>
+  <!-- The standard set of ament lint checks. -->
   <test_depend>ament_lint_common</test_depend>
 
+  <!-- ament-specific package metadata. -->
   <export>
+    <!-- Declares this package's build type to the ament build system. -->
     <build_type>ament_cmake</build_type>
   </export>
 </package>

@@ -7,18 +7,29 @@
     maze_robot.urdf.xacro), not franka_description's own fr3.srdf.xacro, which is
     built for the gripper/hand end effector instead.
 -->
+<!-- Root element: must match the URDF's own robot name. -->
 <robot name="fr3">
+    <!-- The one planning group this project uses. -->
     <group name="fr3_arm">
+        <!-- Defines the group as the kinematic chain from world down to the laser tip. -->
         <chain base_link="world" tip_link="fr3_laser_link"/>
     </group>
 
+    <!-- A named joint configuration the control node returns to after each maze solve. -->
     <group_state name="ready" group="fr3_arm">
+        <!-- Joint 1 angle for the ready pose. -->
         <joint name="fr3_joint1" value="0"/>
+        <!-- Joint 2 angle for the ready pose. -->
         <joint name="fr3_joint2" value="-0.785"/>
+        <!-- Joint 3 angle for the ready pose. -->
         <joint name="fr3_joint3" value="0"/>
+        <!-- Joint 4 angle for the ready pose. -->
         <joint name="fr3_joint4" value="-2.356"/>
+        <!-- Joint 5 angle for the ready pose. -->
         <joint name="fr3_joint5" value="0"/>
+        <!-- Joint 6 angle for the ready pose. -->
         <joint name="fr3_joint6" value="1.571"/>
+        <!-- Joint 7 angle for the ready pose. -->
         <joint name="fr3_joint7" value="0.785"/>
     </group_state>
 
@@ -29,14 +40,24 @@
          the only thing this ACM actually affects, and the control node requests
          avoid_collisions=false regardless: the planner is what keeps a traced
          path inside the maze corridor. -->
+    <!-- world/link0 are adjacent: expected overlap, not a real collision. -->
     <disable_collisions link1="world" link2="fr3_link0" reason="Adjacent"/>
+    <!-- link0/link1 are adjacent. -->
     <disable_collisions link1="fr3_link0" link2="fr3_link1" reason="Adjacent"/>
+    <!-- link1/link2 are adjacent. -->
     <disable_collisions link1="fr3_link1" link2="fr3_link2" reason="Adjacent"/>
+    <!-- link2/link3 are adjacent. -->
     <disable_collisions link1="fr3_link2" link2="fr3_link3" reason="Adjacent"/>
+    <!-- link3/link4 are adjacent. -->
     <disable_collisions link1="fr3_link3" link2="fr3_link4" reason="Adjacent"/>
+    <!-- link4/link5 are adjacent. -->
     <disable_collisions link1="fr3_link4" link2="fr3_link5" reason="Adjacent"/>
+    <!-- link5/link6 are adjacent. -->
     <disable_collisions link1="fr3_link5" link2="fr3_link6" reason="Adjacent"/>
+    <!-- link6/link7 are adjacent. -->
     <disable_collisions link1="fr3_link6" link2="fr3_link7" reason="Adjacent"/>
+    <!-- link7/link8 are adjacent. -->
     <disable_collisions link1="fr3_link7" link2="fr3_link8" reason="Adjacent"/>
+    <!-- link8/laser_link are adjacent. -->
     <disable_collisions link1="fr3_link8" link2="fr3_laser_link" reason="Adjacent"/>
 </robot>

@@ -1,30 +1,58 @@
+# Root key: per-joint limit overrides on top of the URDF's own <limit> tags.
 joint_limits:
+  # Joint 1's limits.
   fr3_joint1:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 3.75
+  # Joint 2's limits.
   fr3_joint2:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 1.875
+  # Joint 3's limits.
   fr3_joint3:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 2.5
+  # Joint 4's limits.
   fr3_joint4:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 3.125
+  # Joint 5's limits.
   fr3_joint5:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 3.75
+  # Joint 6's limits.
   fr3_joint6:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 5.0
-  fr3_joint7: 
+  # Joint 7's limits.
+  fr3_joint7:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 5.0
+  # Gripper finger joint 1's limits (unused by this project's laser end effector, carried over from the Franka reference file).
   fr3_finger_joint1:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 1.0
+  # Gripper finger joint 2's limits (also unused here).
   fr3_finger_joint2:
+    # This joint has an explicit acceleration limit set below.
     has_acceleration_limits: true
+    # Maximum acceleration, rad/s^2.
     max_acceleration: 1.0
 
-    
+

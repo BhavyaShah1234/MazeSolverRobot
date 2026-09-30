@@ -4,27 +4,51 @@
 # Interfaces and gains match franka_ros2's own reference
 # (franka_fr3_moveit_config/config/fr3_ros_controllers.yaml) exactly -- this
 # is real hardware behavior, not something maze_solver gets to choose.
+# Root key: this controller's own parameters.
 joint_trajectory_controller:
+  # ROS2 parameter namespace.
   ros__parameters:
+    # The controller plugin class to load.
     type: joint_trajectory_controller/JointTrajectoryController
+    # The joints this controller commands.
     joints:
+      # FR3 joint 1.
       - fr3_joint1
+      # FR3 joint 2.
       - fr3_joint2
+      # FR3 joint 3.
       - fr3_joint3
+      # FR3 joint 4.
       - fr3_joint4
+      # FR3 joint 5.
       - fr3_joint5
+      # FR3 joint 6.
       - fr3_joint6
+      # FR3 joint 7.
       - fr3_joint7
+    # Which command interface this controller writes to.
     command_interfaces:
+      # Effort (torque) commands, since real hardware is torque-controlled.
       - effort
+    # Which state interfaces this controller reads from.
     state_interfaces:
+      # Current position.
       - position
+      # Current velocity.
       - velocity
+    # Per-joint PID gains used to convert position/velocity error into effort.
     gains:
+      # Joint 1 gains.
       fr3_joint1: { p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0 }
+      # Joint 2 gains.
       fr3_joint2: { p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0 }
+      # Joint 3 gains.
       fr3_joint3: { p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0 }
+      # Joint 4 gains.
       fr3_joint4: { p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0 }
+      # Joint 5 gains (lower, matching the wrist's lower torque limits).
       fr3_joint5: { p: 250.0, d: 10.0, i: 0.0, i_clamp: 1.0 }
+      # Joint 6 gains.
       fr3_joint6: { p: 150.0, d: 10.0, i: 0.0, i_clamp: 1.0 }
+      # Joint 7 gains (lowest, matching the smallest wrist joint's limits).
       fr3_joint7: { p: 50.0, d: 5.0, i: 0.0, i_clamp: 1.0 }

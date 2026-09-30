@@ -1,21 +1,35 @@
 <?xml version="1.0"?>
+<!-- Points editors/validators at the ROS2 package.xml format 3 schema. -->
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!-- Root element: declares this directory as a ROS2 package using format 3. -->
 <package format="3">
+  <!-- This package's name, as referenced by ros2 run/launch and other packages' dependencies. -->
   <name>maze_description</name>
+  <!-- Package version. -->
   <version>0.1.0</version>
+  <!-- Human-readable summary of what this package does. -->
   <description>FR3 + laser-rangefinder xacro for the maze-solving project, with base pose and sim/hardware switch as plain xacro arguments</description>
+  <!-- Package maintainer, with contact email. -->
   <maintainer email="bshah43@asu.edu">Bhavya Shah</maintainer>
+  <!-- License this package is distributed under. -->
   <license>Apache 2.0</license>
 
+  <!-- This is a plain ament_cmake package (xacro/URDF files only, no compiled code). -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- Provides the franka_robot.xacro macro this package's xacro includes. -->
   <exec_depend>franka_description</exec_depend>
+  <!-- Processes this package's xacro into a URDF at launch time. -->
   <exec_depend>xacro</exec_depend>
 
+  <!-- ament's automatic lint-test discovery. -->
   <test_depend>ament_lint_auto</test_depend>
+  <!-- The standard set of ament lint checks. -->
   <test_depend>ament_lint_common</test_depend>
 
+  <!-- ament-specific package metadata. -->
   <export>
+    <!-- Declares this package's build type to the ament build system. -->
     <build_type>ament_cmake</build_type>
   </export>
 </package>
