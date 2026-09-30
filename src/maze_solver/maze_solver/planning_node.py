@@ -304,7 +304,7 @@ class PlanningNode(Node):
         return world_x, world_y
 
     # Convert a world-frame pose into a planning-grid (downsampled) cell.
-    def to_grid_cell(pose: Pose, grid: OccupancyGrid) -> tuple[int, int]:
+    def to_grid_cell(self, pose: Pose, grid: OccupancyGrid) -> tuple[int, int]:
         """Converts a world-frame pose into a planning-grid cell.
 
         Invert grid_xy_to_world for the full-resolution grid, then scale down to the downsampled A* grid.
